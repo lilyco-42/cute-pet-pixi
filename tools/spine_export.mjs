@@ -183,7 +183,7 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
         // 几何探针：cairo 遇到非有限浮点（NaN/Infinity）时会抛 out of memory，
         // 错误信息极具误导性。在 toBuffer 前扫一遍顶点与骨骼变换，先排除这种可能。
         if (opts.geoProbe) {
-          let badV = 0, badB = 0, nAtt = 0, nBone = 0;
+          let badV = 0, badB = 0, nAtt = 0, nBone = 0, maxAbs = 0, maxAbsB = 0;
           for (const drw of skeleton.drawOrder) {
             const att = drw.attachment;
             if (!att) continue;
@@ -192,6 +192,7 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
               const arr = att[key];
               if (!arr) continue;
               for (let q = 0; q < arr.length; q++) {
+                const av = Math.abs(arr[q]); if (av > maxAbs) maxAbs = av;
                 if (!Number.isFinite(arr[q])) {
                   badV++;
                   if (badV <= 4) console.error('GEO frame=' + i + ' att=' + (att.name || '?') + ' ' + key + '[' + q + ']=' + arr[q]);
@@ -202,12 +203,14 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
           }
           for (const b of skeleton.bones) {
             nBone++;
+            const bm = Math.max(Math.abs(b.a), Math.abs(b.b), Math.abs(b.c), Math.abs(b.d), Math.abs(b.worldX), Math.abs(b.worldY)); if (bm > maxAbsB) maxAbsB = bm;
             if (!Number.isFinite(b.a) || !Number.isFinite(b.b) || !Number.isFinite(b.c) || !Number.isFinite(b.d) || !Number.isFinite(b.worldX) || !Number.isFinite(b.worldY)) {
               badB++;
               if (badB <= 4) console.error('GEO frame=' + i + ' bone=' + b.data.name + ' a=' + b.a + ' b=' + b.b + ' c=' + b.c + ' d=' + b.d + ' x=' + b.worldX + ' y=' + b.worldY);
             }
           }
-          console.error('GEO frame=' + i + ' 附件=' + nAtt + ' 骨骼=' + nBone + ' 非有限顶点=' + badV + ' 非有限骨骼=' + badB);
+                  const maxV = maxAbs, maxB = maxAbsB;
+          console.error('GEO frame=' + i + ' 附件=' + nAtt + ' 骨骼=' + nBone + ' 非有限顶点=' + badV + ' 非有限骨骼=' + badB + ' 顶点maxAbs=' + maxV + ' 骨骼maxAbs=' + maxB);
         }
         png = canvas.toBuffer('image/png');
       } catch (e) {

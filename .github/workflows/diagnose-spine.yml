@@ -109,13 +109,17 @@ jobs:
           IMGONLY: ${{ inputs.images_only }}
         run: |
           set -e
-          ARGS="--model models/$MODEL --out _diag --scale $SCALE --fps $FPS --mem-probe $PROBE"
+          # --geo-probe 每次 toBuffer 前检查几何：非有限值 + 最大量级。
+          # cairo 对非有限/超大坐标都会抛 out of memory，必须先排除这类输入问题。
+          ARGS="--model models/$MODEL --out _diag --scale $SCALE --fps $FPS --mem-probe $PROBE --geo-probe 1"
           [ -n "$ANIM" ] && ARGS="$ARGS --anim $ANIM"
           [ "$IMGONLY" = "true" ] && { ARGS="$ARGS --images-only"; echo '::warning::images-only 模式：所有 mesh 被跳过'; }
           echo "运行: node tools/spine_export.mjs $ARGS"
           node tools/spine_export.mjs $ARGS 2>&1 | tee probe.log || true
           echo '--- MEM 采样 ---'
           grep 'MEM ' probe.log || echo '(无 MEM 输出)'
+          echo '--- GEO 采样（几何：非有限值与量级）---'
+          grep 'GEO ' probe.log || echo '(无 GEO 输出)'
           echo '--- 结果 ---'
           grep -E '帧 @|失败' probe.log || true
 
