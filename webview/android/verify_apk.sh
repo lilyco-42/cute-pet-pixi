@@ -51,11 +51,13 @@ for s in "rust/cute_pet/OverlayService" "rust/cute_pet/MainActivity" "rust/cute_
   if unzip -p "$APK" classes.dex | strings | grep -qF "$s"; then ok "dex 含 $s"; else bad "dex 缺 $s"; fi
 done
 
-# ── 5. 权限：没有 INTERNET 时全部 13 个包会静默失败（实测踩过）──
-if unzip -p "$APK" AndroidManifest.xml | strings | grep -q "INTERNET"; then
-  ok "已声明 INTERNET 权限"
+# ── 5. 权限：没有 INTERNET 时全部素材包会静默失败（实测踩过 SecurityException）──
+# 坑：APK 里的 AndroidManifest.xml 是**二进制 XML**，字符串池是 UTF-16LE，而且还被 DEFLATE 压缩过。
+# 所以 unzip -p | strings | grep INTERNET 永远匹配不到 —— CI 上一度因此误报「缺 INTERNET 权限」（其实有）。
+# 用专门的 apk_has_permission.mjs：手动读 zip 中央目录 -> inflate -> 按 UTF-16LE 搜。
+if node "$(dirname "$0")/apk_has_permission.mjs" "$APK" android.permission.INTERNET 2>/dev/null; then
+  ok "已声明 INTERNET 权限（素材下载需要）"
 else bad "缺 INTERNET 权限 —— 素材下载会 SecurityException"; fi
-
 # ── 6. 体积：超过 5 MB 说明素材被误编进去了 ──
 size=$(stat -c%s "$APK" 2>/dev/null || stat -f%z "$APK")
 if [ "$size" -lt 5242880 ]; then ok "体积 $((size/1024)) KB（无素材，符合预期）"
