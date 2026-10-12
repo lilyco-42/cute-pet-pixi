@@ -110,10 +110,15 @@ jobs:
         run: |
           set -e
           unset ELECTRON_RUN_AS_NODE
-          # --no-sandbox 是必需的：CI 上 electron 的 chrome-sandbox 不是 root:4755，
-          # 不加会直接 FATAL:setuid_sandbox_host.cc 然后 SIGTRAP（已实测）。
+          # --no-sandbox 必需：CI 上 chrome-sandbox 不是 root:4755，
+          # 不加会 FATAL:setuid_sandbox_host.cc 然后 SIGTRAP（已实测）。
+          # 还要显式开软件光栅器：无显示环境下 GPU 进程会
+          # 'Exiting GPU process due to errors during initialization'（也已实测），
+          # 于是 WebGL 上下文根本建不起来。
           xvfb-run -a --server-args='-screen 0 1280x1024x24' \
-            npx electron --no-sandbox tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
+            npx electron --no-sandbox \
+              --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader \
+              tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
           echo '--- 校验 ---'
           grep -q '版本' gl.log || { echo '::error::没有打印 skeleton 版本，可能注入失败'; exit 1; }
           grep -q '动画:' gl.log || { echo '::error::没有读到动画列表'; exit 1; }

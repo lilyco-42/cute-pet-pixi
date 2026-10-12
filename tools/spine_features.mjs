@@ -45,10 +45,14 @@ for (const d of dirs) {
     for (const entry of list) {
       const att = entry && entry.attachment;
       if (!att) continue;
-      const t = att.type;
-      if (t === CLIPPING) clipping++;
-      else if (t === 3 /* Mesh */) mesh++;
-      else if (t === 0 /* Region */) region++;
+      // ⚠️ Spine 3.8 的附件**没有 .type 属性** —— AttachmentType 只是编译期枚举，
+      // 运行时实例上取不到（第一版用 att.type 判断，结果所有模型都显示 0，
+      // 连已知有 15 个 mesh 的 Amiya 也是 0，这才暴露出来）。
+      // 正确做法是按构造函数名判断。
+      const cn = (att.constructor && att.constructor.name) || '';
+      if (cn === 'ClippingAttachment') clipping++;
+      else if (cn === 'MeshAttachment') mesh++;
+      else if (cn === 'RegionAttachment') region++;
     }
   }
   // blendMode: 0=Normal 之外的都算非普通混合
