@@ -74,11 +74,18 @@ export async function loadModel(spine, modelDir, baseName) {
     throw new Error('找不到 .skel 或 .json: ' + modelDir);
   }
   const skeleton = new spine.Skeleton(data);
-  // 必须显式应用默认 skin！
-  // Spine 的 Skeleton 构造完成后 skeleton.skin 是 null（spine_diag 实测打印 (none)），
-  // 此时 getAttachment() 对大量槽位返回 null —— 表现是导出的人物只剩残影/特效，
-  // 本体整个消失。实测：德克萨斯动态立绘 333 个槽位里 49 个无附件（斯卡蒂 11/281）。
-  // 这是「动态立绘人物不完整」的真正根因，与 mesh / 混合模式都无关。
+  // 显式应用默认 skin。
+  //
+  // Spine 的 Skeleton 构造完成后 skeleton.skin 是 null（spine_diag 打印 (none)），
+  // 而 updateCache() 里有一句 `bone.active = !bone.data.skinRequired` ——
+  // **标记了 skinRequired 的骨骼在没应用 skin 时是停用的**，
+  // 因此凡是挂在那些骨骼上的附件都不会被绘制。
+  //
+  // ⚠️ 但要如实说明：这条修复**并未改变当前 6 个动态立绘的产物**（帧字节完全相同），
+  // 说明这些模型的 skinRequired 骨骼恰好不关键。它仍然是对的、必须保留 ——
+  // 否则任何真正依赖 skinRequired 的模型都会静默丢部件。
+  //
+  // 德克萨斯「只剩残影」的原因**仍未确定**，见 docs/CI_BUILD.md 的说明。
   if (process.argv.includes('--skin-probe')) {
     console.error('SKINPROBE skins=' + JSON.stringify((data.skins || []).map(function (s) {
       try { return s.name + '(' + (s.attachments ? s.attachments.length : '?') + ')'; } catch (e) { return s.name + '(err)'; }
