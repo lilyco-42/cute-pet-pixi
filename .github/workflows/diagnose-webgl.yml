@@ -48,13 +48,16 @@ jobs:
           node -e "
             const fs=require('fs');
             const m=JSON.parse(fs.readFileSync('_ark/models_data.json','utf8'));
+            // 动态立绘在 models_illust/ 下，干员/敌人在 models/ 下 —— 按 type 选。
+            // 上一版把它们都当下 models/，动态立绘全部 404（已实测）。
             const keys=['002_amiya','2023_ling','dyn_illust_1028_texas2','dyn_illust_1012_skadi2'];
             for(const k of keys){
               const e=m.data[k]; if(!e){console.log('缺 '+k);continue;}
+              const sub = e.type==='DynIllust' ? 'models_illust' : 'models';
               fs.mkdirSync('models/'+k,{recursive:true});
               for(const f of Object.values(e.assetList)){
                 require('child_process').execFileSync('curl',['-fsSL','-o','models/'+k+'/'+f,
-                  'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/'+encodeURIComponent(k)+'/'+encodeURIComponent(f)],{stdio:'inherit'});
+                  'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/'+sub+'/'+encodeURIComponent(k)+'/'+encodeURIComponent(f)],{stdio:'inherit'});
               }
             }
           "
@@ -107,8 +110,10 @@ jobs:
         run: |
           set -e
           unset ELECTRON_RUN_AS_NODE
+          # --no-sandbox 是必需的：CI 上 electron 的 chrome-sandbox 不是 root:4755，
+          # 不加会直接 FATAL:setuid_sandbox_host.cc 然后 SIGTRAP（已实测）。
           xvfb-run -a --server-args='-screen 0 1280x1024x24' \
-            npx electron tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
+            npx electron --no-sandbox tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
           echo '--- 校验 ---'
           grep -q '版本' gl.log || { echo '::error::没有打印 skeleton 版本，可能注入失败'; exit 1; }
           grep -q '动画:' gl.log || { echo '::error::没有读到动画列表'; exit 1; }
