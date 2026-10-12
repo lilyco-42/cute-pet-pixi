@@ -1,0 +1,32 @@
+feat(export): WebGL/GPU 导出路径（spine-webgl 3.8.95）
+
+目标里「WebGL/pixi-spine 导出器」这一项。做法上有个更好的选择：
+
+**不用 pixi-spine，直接用官方 spine-webgl。**
+原因：spine-webgl 的 tag 是 3.8.95，与已 vendored 的 spine-core/spine-canvas
+**同一个 tag**，和明日方舟模型（skeleton 3.8.99）版本严格对齐 ——
+而 pixi-spine 要配 pixi.js 7，与项目现有 pixi.js 8 冲突，且版本矩阵复杂。
+
+新增：
+  vendor/spine-3.8/spine-webgl.js   官方预编译产物（410 KB，sha256 已记录）
+  vendor/spine-3.8/README.md        来源/版本/能力差异/许可说明
+  tools/spine_webgl_bake.html       离屏烘焙页（真实 GL 上下文）
+  tools/spine_webgl_export.mjs      Electron 驱动
+  tools/spine_features.mjs          量出哪些模型真的用了 clipping
+  .github/workflows/diagnose-webgl.yml  在 CI 上验证两条路径
+
+为什么要 Electron 当宿主：它自带 Chromium = 真实 GL 上下文，
+项目本来就依赖它，不必再引 headless-gl / node-gyp 那套原生编译。
+
+实测的能力差异（这是做这件事的理由）：
+  spine-canvas：'stencil' 出现 **0 处** —— 只解析 ClippingAttachment，遮罩静默失效
+  spine-webgl ：Clipping 38 处、blendMode 16 处 —— GPU 模板遮罩 + 原生混合模式
+
+两个实现细节（都是踩过的坑）：
+  1. WebGL 的 readPixels 原点在左下、PNG 在左上 —— 必须逐行翻转，否则小人是倒的
+  2. 必须 preserveDrawingBuffer:true，否则合成后 drawingBuffer 被清、readPixels 拿不到内容
+
+PNG 同样自写（绕开内置编码器），复用 canvas 路径踩出来的那个结论。
+
+注意：这条路径**尚未证明当前模型集需要它**。spine_features.mjs 会先量
+「有多少模型用了 clipping」，如果为 0，则 canvas 仍够用、webgl 作为备用能力保留。

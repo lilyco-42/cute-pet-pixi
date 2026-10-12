@@ -1,0 +1,122 @@
+name: Diagnose WebGL Renderer
+
+# 验证 WebGL（GPU）导出路径 —— 用于需要 clipping 遮罩的模型。
+#
+# 背景：spine-canvas 只解析 ClippingAttachment、没有 stencil 实现（实测 'stencil' 0 处），
+# 所以遮罩被静默忽略。spine-webgl 走 GPU 模板，能力完整。
+#
+# 这个 workflow 做两件事：
+#   1. spine_features.mjs：量出当前模型集里有多少真的用了 clipping
+#   2. spine_webgl_export.mjs：在真实 GL 上下文里跑一遍，证明路径可用
+#
+# 为什么要 GPU runner：软件渲染（llvmpipe/SwiftShader）也能建 GL 上下文，
+# 所以标准 ubuntu runner 就够 —— 但必须装 Mesa 的软件光栅器。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/spine_webgl_*'
+      - 'tools/spine_features.mjs'
+      - 'vendor/spine-3.8/**'
+      - '.github/workflows/diagnose-webgl.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: diagnose-webgl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  features:
+    name: 统计需要 GPU 的模型
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: 下载一批代表性模型
+        run: |
+          set -e
+          mkdir -p _ark models
+          curl -fsSL https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models_data.json -o _ark/models_data.json
+          node -e "
+            const fs=require('fs');
+            const m=JSON.parse(fs.readFileSync('_ark/models_data.json','utf8'));
+            const keys=['002_amiya','2023_ling','dyn_illust_1028_texas2','dyn_illust_1012_skadi2'];
+            for(const k of keys){
+              const e=m.data[k]; if(!e){console.log('缺 '+k);continue;}
+              fs.mkdirSync('models/'+k,{recursive:true});
+              for(const f of Object.values(e.assetList)){
+                require('child_process').execFileSync('curl',['-fsSL','-o','models/'+k+'/'+f,
+                  'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/'+encodeURIComponent(k)+'/'+encodeURIComponent(f)],{stdio:'inherit'});
+              }
+            }
+          "
+      - name: 特性统计（clipping / mesh / 混合模式）
+        run: node tools/spine_features.mjs | tee features.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spine-features
+          path: features.log
+          if-no-files-found: warn
+
+  webgl:
+    name: WebGL 导出路径可跑
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 依赖 + Mesa 软件光栅器
+        # Electron 在无显示环境需要 xvfb；Chromium 的 GL 走 SwiftShader/llvmpipe。
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev \
+            xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 下载一个模型
+        run: |
+          set -e
+          mkdir -p _ark models
+          curl -fsSL https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models_data.json -o _ark/models_data.json
+          node -e "
+            const fs=require('fs');
+            const m=JSON.parse(fs.readFileSync('_ark/models_data.json','utf8'));
+            const k='002_amiya'; const e=m.data[k];
+            fs.mkdirSync('models/'+k,{recursive:true});
+            for(const f of Object.values(e.assetList)){
+              require('child_process').execFileSync('curl',['-fsSL','-o','models/'+k+'/'+f,
+                'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/'+encodeURIComponent(k)+'/'+encodeURIComponent(f)],{stdio:'inherit'});
+            }
+          "
+
+      - name: 在 xvfb 里跑 WebGL 导出器
+        # ELECTRON_RUN_AS_NODE 必须清掉：它会让 require('electron') 返回二进制路径字符串，
+        # app/BrowserWindow 全都不存在（这个坑在 Electron 侧已经踩过一次）。
+        run: |
+          set -e
+          unset ELECTRON_RUN_AS_NODE
+          xvfb-run -a --server-args='-screen 0 1280x1024x24' \
+            npx electron tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
+          echo '--- 校验 ---'
+          grep -q '版本' gl.log || { echo '::error::没有打印 skeleton 版本，可能注入失败'; exit 1; }
+          grep -q '动画:' gl.log || { echo '::error::没有读到动画列表'; exit 1; }
+          echo '✅ WebGL 路径可用'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spine-webgl-log
+          path: gl.log
+          if-no-files-found: warn
