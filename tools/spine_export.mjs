@@ -180,6 +180,35 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
         ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
         renderer.draw(skeleton);
         stage = 'toBuffer';
+        // 几何探针：cairo 遇到非有限浮点（NaN/Infinity）时会抛 out of memory，
+        // 错误信息极具误导性。在 toBuffer 前扫一遍顶点与骨骼变换，先排除这种可能。
+        if (opts.geoProbe) {
+          let badV = 0, badB = 0, nAtt = 0, nBone = 0;
+          for (const drw of skeleton.drawOrder) {
+            const att = drw.attachment;
+            if (!att) continue;
+            nAtt++;
+            for (const key of ['vertices', 'regionUVs', 'uvs']) {
+              const arr = att[key];
+              if (!arr) continue;
+              for (let q = 0; q < arr.length; q++) {
+                if (!Number.isFinite(arr[q])) {
+                  badV++;
+                  if (badV <= 4) console.error('GEO frame=' + i + ' att=' + (att.name || '?') + ' ' + key + '[' + q + ']=' + arr[q]);
+                  break;
+                }
+              }
+            }
+          }
+          for (const b of skeleton.bones) {
+            nBone++;
+            if (!Number.isFinite(b.a) || !Number.isFinite(b.b) || !Number.isFinite(b.c) || !Number.isFinite(b.d) || !Number.isFinite(b.worldX) || !Number.isFinite(b.worldY)) {
+              badB++;
+              if (badB <= 4) console.error('GEO frame=' + i + ' bone=' + b.data.name + ' a=' + b.a + ' b=' + b.b + ' c=' + b.c + ' d=' + b.d + ' x=' + b.worldX + ' y=' + b.worldY);
+            }
+          }
+          console.error('GEO frame=' + i + ' 附件=' + nAtt + ' 骨骼=' + nBone + ' 非有限顶点=' + badV + ' 非有限骨骼=' + badB);
+        }
         png = canvas.toBuffer('image/png');
       } catch (e) {
         console.error('SEG frame=' + i + ' stage=' + stage + ' canvas=' + cw + 'x' + ch + ' attempt=' + attempt + ' err=' + e.message);
@@ -263,7 +292,8 @@ async function main() {
       fps, scale, bounds, total, prefix: name,
       imagesOnly: !!a['images-only'],   // 诊断开关：复现「只画 region、丢掉 mesh」的旧行为
       recycle: a.recycle,
-      memProbe: a['mem-probe'],               // 每 N 帧重建 canvas；重 mesh 模型要给 1
+      memProbe: a['mem-probe'],
+      geoProbe: a['geo-probe'],               // 每 N 帧重建 canvas；重 mesh 模型要给 1
     });
     for (const f of res.frames) fs.writeFileSync(path.join(outDir, 'frames', f.file), f.canvas);
     animations[name] = {
