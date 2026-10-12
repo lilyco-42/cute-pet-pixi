@@ -1,0 +1,20 @@
+diag: 分段定位 OOM（draw vs toBuffer）+ 失败重建重试 + 尺寸阈值扫描
+
+CI 上的实测推翻了「内存不足」假设：
+  环境 16 GB / 4 核 / cairo 1.18.0
+  MEM frame=0  rss=98.4M  heap=16.2M  ext=4.6M
+  MEM frame=14 rss=98.4M  heap=16.2M  ext=5.2M   <- 完全平坦
+  然后 out of memory
+
+内存曲线平坦却报 OOM，说明「out of memory」是被统一了的错误信息，
+未必真的耗尽内存（也可能是 cairo 内部某次分配失败）。
+
+改动：
+1. tools/spine_export.mjs 每帧把 draw 与 toBuffer 分开 try/catch，
+   失败时打印 SEG frame=N stage=draw|toBuffer canvas=WxH，精确定位抛点。
+2. 同帧重建 canvas 重试一次（RETRY），若失败源于 surface 状态而非本帧内容，重试就能过。
+3. 新增 .github/workflows/diagnose-scale.yml：固定帧数、matrix 扫 scale
+   0.5/0.35/0.25/0.2/0.15/0.12/0.08，看阈值跟画布尺寸还是帧数相关。
+
+顺带修了我自己引入的一个真 bug：重试改造时把 renderer.draw() 从循环里删掉、
+只在重试分支补回，导致 attempt=0 根本不画（产出全空帧）。已改为每次尝试都完整重画。

@@ -1,0 +1,95 @@
+name: Diagnose Scale Threshold
+
+# 假设：cairo 报的 "out of memory" 不是内存耗尽（内存曲线是平的），
+# 而是 surface 尺寸/像素数超限被统一报成 OOM。
+# 本 workflow 用固定帧数、把 scale 从大到小扫一遍，定位阈值。
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: '模型 key'
+        required: true
+        default: '2023_ling'
+        type: string
+      anim:
+        description: '动画名'
+        required: true
+        default: 'Move'
+        type: string
+      frames:
+        description: '固定帧数（避免帧数成为变量）'
+        required: false
+        default: '16'
+        type: string
+
+concurrency:
+  group: diagnose-scale
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: 尺寸阈值扫描
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scale: ['0.5', '0.35', '0.25', '0.2', '0.15', '0.12', '0.08']
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 下载模型
+        env:
+          MK: ${{ inputs.model }}
+        run: |
+          set -e
+          mkdir -p _ark models
+          curl -fsSL https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models_data.json -o _ark/models_data.json
+          node -e "
+            const fs=require('fs');
+            const m=JSON.parse(fs.readFileSync('_ark/models_data.json','utf8'));
+            const k=process.env.MK, e=m.data[k];
+            if(!e){console.error('没有 '+k);process.exit(1);}
+            fs.mkdirSync('models/'+k,{recursive:true});
+            for(const f of Object.values(e.assetList)){
+              require('child_process').execFileSync('curl',['-fsSL','-o','models/'+k+'/'+f,'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/'+encodeURIComponent(k)+'/'+encodeURIComponent(f)],{stdio:'inherit'});
+            }
+          "
+
+      - name: 扫 scale=${{ matrix.scale }}
+        env:
+          MK: ${{ inputs.model }}
+          ANIM: ${{ inputs.anim }}
+          N: ${{ inputs.frames }}
+          SC: ${{ matrix.scale }}
+        run: |
+          node tools/spine_export.mjs --model models/$MK --out _s --anim $ANIM \
+            --scale $SC --fps 8 --max-frames $N --mem-probe 4 --id x 2>&1 | tee s.log || true
+          SIZE=$(grep -oE '[0-9]+x[0-9]+' s.log | tail -1)
+          LAST=$(grep 'MEM ' s.log | tail -1)
+          if grep -q 'out of memory' s.log; then RES='OOM'; else RES='OK '; fi
+          echo "scale=$SC  $RES  画布=${SIZE:-?}  $LAST"
+          # 画布像素数（用于验证「像素数上限」假设）
+          if [ -n "$SIZE" ]; then
+            W=${SIZE%x*}; H=${SIZE#*x}
+            echo "  像素数 = $((W*H))  ($(echo "$W*$H/1000000" | bc -l) 百万)"
+          fi
+
+      - name: 结论
+        run: |
+          if grep -q 'out of memory' s.log; then
+            echo "::warning::scale=${{ matrix.scale }} 复现 OOM"
+          else
+            echo "scale=${{ matrix.scale }} 通过"
+          fi

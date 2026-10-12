@@ -162,14 +162,37 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
     ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
-    renderer.draw(skeleton);
+    // 分段诊断 + 自愈：cairo 在内存曲线完全平坦时也会抛 out of memory，
+    // 说明未必真的耗尽内存。把 draw 与 toBuffer 分开捕获，先定位抛在哪一段；
+    // 再重建 canvas 重试一次 —— 若失败源于 surface 状态（而非本帧内容），重试就能过。
+    let png = null, stage = 'draw';
+    for (let attempt = 0; attempt < 2 && png === null; attempt++) {
+      if (attempt > 0) {
+        canvas = createCanvas(cw, ch);
+        ctx = canvas.getContext('2d');
+        renderer = new Renderer(ctx);
+        renderer.triangleRendering = opts.imagesOnly ? false : true;
+        ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
+        console.error('RETRY frame=' + i + ' 第 ' + (attempt + 1) + ' 次重建后重试');
+      }
+      try {
+        // 每次尝试都完整重画：round 0 用当前 surface，round 1 用重建后的。
+        ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
+        renderer.draw(skeleton);
+        stage = 'toBuffer';
+        png = canvas.toBuffer('image/png');
+      } catch (e) {
+        console.error('SEG frame=' + i + ' stage=' + stage + ' canvas=' + cw + 'x' + ch + ' attempt=' + attempt + ' err=' + e.message);
+        if (attempt === 1) throw e;
+      }
+    }
     // 内存探针：区分「逐帧累积」还是「单帧尖峰」。
     // 只有在 --mem-probe N 时才打印，默认零开销。
     if (opts.memProbe && (i % Number(opts.memProbe) === 0 || i === total - 1)) {
       const m = process.memoryUsage();
       console.error("MEM frame=" + i + " rss=" + (m.rss/1048576).toFixed(1) + "M heap=" + (m.heapUsed/1048576).toFixed(1) + "M ext=" + (m.external/1048576).toFixed(1) + "M");
     }
-    frames.push({ file: prefix + '_' + String(i).padStart(3, '0') + '.png', canvas: canvas.toBuffer('image/png') });
+    frames.push({ file: prefix + '_' + String(i).padStart(3, '0') + '.png', canvas: png });
     advance(state, skeleton, fps);
   }
   return { frames, width: cw, height: ch };
