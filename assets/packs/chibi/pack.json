@@ -113,5 +113,77 @@
         }
       }
     }
+  },
+  "behaviors": {
+    "initial": "idle",
+    "speed": {
+      "walk": 34,
+      "chase": 60,
+      "surisuri": 60
+    },
+    "contactRadius": 10,
+    "choose": {
+      "excludePrevious": true,
+      "weights": {
+        "walking": 45,
+        "resting": 55
+      }
+    },
+    "states": {
+      "idle": {
+        "phases": [
+          {
+            "clip": "idle",
+            "loops": -1,
+            "duration": [
+              5,
+              12
+            ]
+          }
+        ],
+        "after": "choose"
+      },
+      "walking": {
+        "phases": [
+          {
+            "clip": "idle",
+            "loops": -1,
+            "movement": "walk",
+            "duration": [
+              3,
+              7
+            ]
+          }
+        ],
+        "after": "idle"
+      },
+      "resting": {
+        "phases": [
+          {
+            "clip": "idle",
+            "loops": -1,
+            "duration": [
+              6,
+              14
+            ]
+          }
+        ],
+        "after": "idle"
+      },
+      "chasing": {
+        "phases": [
+          {
+            "clip": "idle",
+            "loops": -1,
+            "movement": "chase",
+            "duration": [
+              5,
+              5
+            ]
+          }
+        ],
+        "after": "idle"
+      }
+    }
   }
 }

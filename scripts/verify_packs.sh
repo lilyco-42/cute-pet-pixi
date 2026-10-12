@@ -24,7 +24,9 @@ node - "$INDEX" <<'EOF'
 const fs = require('fs');
 const idx = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const errs = [];
-if (idx.schema !== 1) errs.push('schema 应为 1，实际 ' + idx.schema);
+// 兼容两种写法：pack.json 用 schema，索引历史上用 version（运行时读的是 version）。
+const ver = idx.schema !== undefined ? idx.schema : idx.version;
+if (ver !== 1) errs.push('schema/version 应为 1，实际 ' + ver);
 if (!Array.isArray(idx.packs)) errs.push('packs 应为数组');
 const seen = new Set();
 for (const p of idx.packs || []) {
@@ -62,6 +64,23 @@ if (!p.animations || !Object.keys(p.animations).length) errs.push('缺 animation
 // behaviors 是「桌宠会不会自己动」的开关；漏了就是站着不动且不报错。
 if (!p.behaviors) errs.push('缺 behaviors —— 桌宠会静止不动（运行时静默降级）');
 else if (!p.behaviors.states || !Object.keys(p.behaviors.states).length) errs.push('behaviors.states 为空');
+else {
+  // 更深一层：behaviors 里引用的 clip 必须真实存在，否则运行时切到该状态会崩。
+  const clips = new Set(Object.keys(p.animations || {}));
+  for (const [sn, sd] of Object.entries(p.behaviors.states)) {
+    if (!p.behaviors.states[p.behaviors.initial]) errs.push('initial=' + p.behaviors.initial + ' 不是 states 里的键');
+    for (const ph of sd.phases || []) {
+      if (ph.clip && !clips.has(ph.clip)) errs.push('状态 ' + sn + ' 引用了不存在的 clip "' + ph.clip + '"，可用: ' + [...clips].join(','));
+    }
+    if (sd.after && sd.after !== 'idle' && sd.after !== 'choose' && !p.behaviors.states[sd.after]) {
+      errs.push('状态 ' + sn + ' 的 after="' + sd.after + '" 不存在');
+    }
+  }
+  // 权重表里的状态也必须存在
+  for (const k of Object.keys(p.behaviors.choose?.weights || {})) {
+    if (!p.behaviors.states[k]) errs.push('choose.weights 引用了不存在的状态 ' + k);
+  }
+}
 // 每个帧文件的 src 必须真实存在
 const dir = path.dirname(f);
 let n = 0;
@@ -84,9 +103,16 @@ if [ $? -eq 0 ]; then ok "chibi 包完整"; else bad "chibi 包"; fi
 
 # ── 3. 合规：仓库里不得出现第三方版权角色素材 ──
 echo "== 合规闸门 =="
-leaked=$(find "$ROOT/assets/packs" -mindepth 1 -maxdepth 1 -type d ! -name chibi 2>/dev/null)
-if [ -z "$leaked" ]; then ok "仓库内只有自绘 chibi（第三方素材走 Release 下载）"
-else bad "仓库里混入了第三方素材目录：$(echo "$leaked" | tr '\n' ' ')"; fi
-
+# 只认「被 git 跟踪」的文件：本地开发时 assets/packs/ 下会躺着大量烘焙好的
+# 第三方素材（被 .gitignore 挡着），那不是违规；CI 检出的是干净工作树。
+if command -v git >/dev/null 2>&1 && git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  leaked=$(git -C "$ROOT" ls-files "assets/packs/*" | grep -v "^assets/packs/chibi/" | head -10)
+  ctx="git 跟踪的文件"
+else
+  leaked=$(find "$ROOT/assets/packs" -mindepth 1 -maxdepth 1 -type d ! -name chibi 2>/dev/null | head -10)
+  ctx="工作区目录（无 git）"
+fi
+if [ -z "$leaked" ]; then ok "仓库内只有自绘 chibi（第三方素材走 Release 下载，$ctx）"
+else bad "仓库里混入了第三方素材（见上）"; fi
 echo "== 通过 $pass / 失败 $fail =="
 [ "$fail" -eq 0 ] || exit 1
