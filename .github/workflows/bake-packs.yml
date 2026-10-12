@@ -104,13 +104,23 @@ jobs:
           du -sh assets/packs/* 2>/dev/null | sed 's/^/  /' || true
           ls -la dist-packs/ | sed 's/^/  /' || true
 
+      - name: 确认产物存在（上传前先自查，避免 upload-artifact 报「not a git repository」这种误导信息）
+        run: |
+          set -e
+          n=$(ls dist-packs/*.tar.gz 2>/dev/null | wc -l)
+          echo "归档数: $n"
+          [ "$n" -gt 0 ] || { echo "::error::dist-packs 里没有 tar.gz"; exit 1; }
+          [ -f assets/packs-index.json ] || { echo "::error::缺 assets/packs-index.json"; exit 1; }
+          du -h dist-packs/*.tar.gz | sed 's/^/  /'
+
       - uses: actions/upload-artifact@v4
         with:
           name: baked-packs-${{ inputs.version }}
           path: |
-            dist-packs/*.tar.gz
+            dist-packs/
             assets/packs-index.json
           if-no-files-found: error
+          retention-days: 14
 
       - name: 校验索引结构与命名约定
         run: bash scripts/verify_packs.sh
@@ -122,6 +132,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 必须先 checkout：gh 在没有 .git 的目录里会报
+      # "failed to run git: fatal: not a git repository"。
+      # 上一版漏了这步，于是烘焙全部成功、却卡在最后一步发布失败。
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: baked-packs-${{ inputs.version }}

@@ -95,22 +95,71 @@ gh workflow run bake-packs.yml --repo lilyco-42/cute-pet-pixi \
 
 烘焙完会自动 `gh release upload packs-<ver>`，仓库里**不留**任何第三方素材。
 
-## 关于重 mesh 模型的 out of memory
+## 重 mesh 模型的 "out of memory"：已定位并修复
 
-很重的模型（动态立绘）在 node-canvas 上会 OOM，而且**与画布尺寸无关、只与累计帧数有关** ——
-说明吃的是 cairo 原生内存而不是 JS 堆（所以 `--max-old-space-size` 无效）。
+重 mesh 模型（动态立绘 279 个 MeshAttachment）导出时会抛 `out of memory`。
+**那个错误信息是误导性的 —— 根本不是内存不足。**
 
-尝试过的办法与结果：
+### 排除法定位（每步都是 CI 实测）
 
-| 办法 | 结果 |
+| 假设 | 证据 | 结论 |
+|---|---|---|
+| 内存耗尽 | frame 0→14 rss 稳定 **97 MB**、heap 16 MB（机器 16 GB） | 排除 |
+| 画布尺寸超限 | scale 0.08~0.5 **全部**复现，197×219 也一样挂 | 排除 |
+| surface 状态坏 | 重建 canvas 后重试**仍然失败** | 排除 |
+| 几何数据坏 | 91 附件 / 272 骨骼 / 0 非有限值 / maxAbs 216~894 全正常 | 排除 |
+| **cairo 的 PNG 编码器** | 同一帧 `getImageData` 正常（17214 个不透明像素），`toBuffer` 却抛 OOM | **确认** |
+
+关键判别实验是 `--png-probe`：在 `toBuffer()` 之前先 `getImageData()`。
+
+- 若 `getImageData` 也挂 → surface 本身有问题
+- 若它过、`toBuffer` 挂 → **是 PNG 编码器的问题**（实测就是这个）
+
+### 修复
+
+既然像素数据是好的，就绕开 cairo 的编码器**自己封 PNG**：
+
+```
+IHDR + IDAT(zlib.deflateSync) + IEND
+每行前置一个 filter 字节 0x00 (None)
+CRC32 按 PNG 规范显式实现（多项式 0xEDB88320）
+```
+
+验证（CI）：
+
+```
+检查 43 个 PNG
+尺寸: 197x219
+解不开: 0   空帧: 0
+PNG 自检通过
+```
+
+`SEG`/`RETRY`（失败与重试）出现 **0 次** —— OOM 彻底消失。
+
+### 自己写的东西必须被独立验证
+
+`tools/verify_png.mjs` 用 node-canvas **反解**产物，验三件事：能读、尺寸对、非全透明。
+否则会产出「能生成但读不了」的文件，一路漏到运行时只表现为画面空白。
+该自检已接进诊断 workflow（`if: always()`）。
+
+### 诊断开关一览
+
+| 开关 | 作用 |
 |---|---|
-| 加大 Node 堆 | 无效（不是 JS 堆） |
-| 降帧率/降分辨率 | 能过但动画废了（只有 8 帧） |
-| 定期重建 canvas/context | **负优化**：每次 `createCanvas` 新增一张 surface，只增不减 |
-| 每段动画独立进程 + 共享包围盒 | 有效，已实现（`--scan-only` / `--bounds-json` / `--merge`） |
+| `--mem-probe N` | 每 N 帧打印 rss/heap/external |
+| `--geo-probe` | `toBuffer` 前检查非有限值与最大量级 |
+| `--png-probe` | 先 `getImageData` 判别编码器 vs surface |
+| `--self-png=false` | 回退到 cairo 的 `toBuffer`（A/B 对照） |
+| `--images-only` | 关掉三角形渲染（复现「mesh 被静默跳过」的旧行为） |
+| `--recycle N` | 每 N 帧重建 canvas（**实测是负优化**，默认关） |
 
-当前做法：`arknights_batch.mjs` 先扫一次共享包围盒，再**一段动画起一个进程**，
-最后用 `--merge` 合并 `pack.json`。CI 机器内存更宽裕，能扛住更重的模型。
+### 仍然有效的工程做法
 
-**正解**是把导出器从 node-canvas 换成离屏 WebGL（Electron + Pixi7 + `pixi-spine@4.0.6`），
-那样还能一并支持 clipping 的 stencil mask 与全部混合模式。**尚未开始。**
+`arknights_batch.mjs` 先扫一次共享包围盒，再**一段动画起一个进程**，
+最后用 `--merge` 合并 `pack.json`。这仍然有价值：单进程内 cairo 的累积确实存在，
+分进程能让失败被隔离到单个动画，而不是毁掉整包。
+
+### 未做的事
+
+换成离屏 WebGL（Electron + Pixi7 + `pixi-spine@4.0.6`）能一并支持 **clipping 的 stencil mask**
+与全部混合模式，那才是更彻底的路。当前 node-canvas 路径已经够用，**换渲染器尚未开始**。

@@ -147,5 +147,7 @@ jobs:
         if: always()
         with:
           name: diagnose-${{ inputs.model }}-${{ inputs.anim || 'all' }}
-          path: probe.log
+          path: |
+            probe.log
+            _diag/frames/
           if-no-files-found: warn
