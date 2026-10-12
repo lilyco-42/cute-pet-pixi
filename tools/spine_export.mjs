@@ -179,6 +179,20 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
         // 每次尝试都完整重画：round 0 用当前 surface，round 1 用重建后的。
         ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
         renderer.draw(skeleton);
+        // 关键判别：先 getImageData 把 surface 读成像素。
+        //   - getImageData 也挂  -> surface 本身有问题
+        //   - getImageData 能过而 toBuffer 挂 -> 是 PNG 编码器的问题
+        // 后者可控：绕开 cairo 的 PNG 编码，自己用 zlib 写。
+        if (opts.pngProbe) {
+          try {
+            stage = 'getImageData';
+            const d = ctx.getImageData(0, 0, cw, ch);
+            let nz = 0; for (let q = 3; q < d.data.length; q += 4) if (d.data[q] > 16) nz++;
+            console.error('PNGPROBE frame=' + i + ' getImageData=OK 不透明像素=' + nz);
+          } catch (e2) {
+            console.error('PNGPROBE frame=' + i + ' getImageData=FAIL err=' + e2.message);
+          }
+        }
         stage = 'toBuffer';
         // 几何探针：cairo 遇到非有限浮点（NaN/Infinity）时会抛 out of memory，
         // 错误信息极具误导性。在 toBuffer 前扫一遍顶点与骨骼变换，先排除这种可能。
@@ -296,7 +310,8 @@ async function main() {
       imagesOnly: !!a['images-only'],   // 诊断开关：复现「只画 region、丢掉 mesh」的旧行为
       recycle: a.recycle,
       memProbe: a['mem-probe'],
-      geoProbe: a['geo-probe'],               // 每 N 帧重建 canvas；重 mesh 模型要给 1
+      geoProbe: a['geo-probe'],
+      pngProbe: a['png-probe'],               // 每 N 帧重建 canvas；重 mesh 模型要给 1
     });
     for (const f of res.frames) fs.writeFileSync(path.join(outDir, 'frames', f.file), f.canvas);
     animations[name] = {

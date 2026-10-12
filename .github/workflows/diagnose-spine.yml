@@ -111,7 +111,7 @@ jobs:
           set -e
           # --geo-probe 每次 toBuffer 前检查几何：非有限值 + 最大量级。
           # cairo 对非有限/超大坐标都会抛 out of memory，必须先排除这类输入问题。
-          ARGS="--model models/$MODEL --out _diag --scale $SCALE --fps $FPS --mem-probe $PROBE --geo-probe 1"
+          ARGS="--model models/$MODEL --out _diag --scale $SCALE --fps $FPS --mem-probe $PROBE --geo-probe 1 --png-probe 1"
           [ -n "$ANIM" ] && ARGS="$ARGS --anim $ANIM"
           [ "$IMGONLY" = "true" ] && { ARGS="$ARGS --images-only"; echo '::warning::images-only 模式：所有 mesh 被跳过'; }
           echo "运行: node tools/spine_export.mjs $ARGS"
