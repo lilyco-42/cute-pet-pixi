@@ -46,6 +46,12 @@
 !/assets/packs/chibi/
 
 # ── 调试期产物 ──
+# 根目录下划线开头的都是本地草稿（临时脚本/提交信息/探针），不该入库。
+# 例外：_ark/models_data.json 是构建必需（CI 烘焙时读它当模型索引），必须留。
+/_*
+!/_ark/
+/_ark/*
+!/_ark/models_data.json
 *.log
 /_idx.txt
 /_q.js

@@ -123,6 +123,7 @@ jobs:
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
       - name: 构建 APK
+        # build.sh 内部会把 $BT 加进 PATH —— SDK 工具默认不在 PATH 里。
         run: bash webview/android/build.sh --sdk "$ANDROID_HOME"
 
       - name: 产物校验（结构 / 合规 / 依赖 / 桥 / 权限 / 体积）

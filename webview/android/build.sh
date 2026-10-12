@@ -32,12 +32,17 @@ OUT="$HERE/bin"
 WORK="$HERE/build"
 
 echo "SDK=$SDK  BT=$BT  PLATFORM=$PLATFORM"
+# 关键：Android SDK 的工具不在 PATH 里，必须自己加进去。
+# 少了这一句就是 "aapt2: command not found" + exit 127（已实测踩到）。
+export PATH="$BT:$BT/lib:$PATH"
 for t in aapt2 d8 zipalign apksigner; do
   if [ ! -x "$BT/$t" ] && [ ! -f "$BT/$t" ] && [ ! -f "$BT/$t.bat" ]; then
     echo "::error::缺工具: $BT/$t"; exit 2
   fi
 done
 [ -f "$JAR" ] || { echo "::error::缺 android.jar: $JAR"; exit 2; }
+# d8 是个 wrapper 脚本，内部还会找 java；确认工具真的能跑起来
+"$BT/aapt2" version 2>&1 | head -1 | sed 's/^/  /' || true
 
 rm -rf "$WORK" "$OUT"
 mkdir -p "$WORK/classes" "$WORK/dex" "$OUT"

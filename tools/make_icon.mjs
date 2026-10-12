@@ -4,9 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createCanvas, loadImage } from 'canvas';
 
-const src = process.argv[2];
-const out = process.argv[3];
+// 参数可省略：默认拿仓库里自绘的 chibi 首帧当源图，输出 build/icon.ico。
+// 之前没有默认值，CI 里裸跑 `node tools/make_icon.mjs` 会拿 undefined 去 readFileSync，
+// 报 ERR_INVALID_ARG_TYPE 然后整个打包 job 挂掉（已实测）。
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+const src = process.argv[2] || path.join(ROOT, 'assets/packs/chibi/frames/idle_00.png');
+const out = process.argv[3] || path.join(ROOT, 'build/icon.ico');
 const SIZE = 256;
+if (!fs.existsSync(src)) { console.error('找不到源图: ' + src); process.exit(1); }
 const img = await loadImage(fs.readFileSync(src));
 const c = createCanvas(SIZE, SIZE);
 const ctx = c.getContext('2d');
