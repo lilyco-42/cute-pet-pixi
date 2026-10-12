@@ -1,0 +1,56 @@
+# cute-pet（Electron + PixiJS 宿主）.gitignore
+#
+# 三条规矩，照抄 lilyco-42/cute-pet 踩过的坑：
+#   1. 目录规则一律锚定（以 / 开头），不用裸目录名去匹配任意层级
+#      —— 裸 "tools/" 会把 pet/tools/* 整目录静默吃掉。
+#   2. assets/packs/** 里不用任何后缀通配 —— 例外写死比整类静默丢失强
+#      —— 旧仓库用 *.png 一次吃掉 117 个已入库素材。
+#   3. 要忽略的产物按「它在哪生成」精确描述，而不是「它叫什么后缀」。
+#
+# ⚠️ 行尾不能写注释：git 会把 "# 注释" 当成模式的一部分，规则静默失效。
+#    （这个坑刚踩过：/models/ 带了注释就再也没匹配上。）
+#
+# 自查（应恒为零输出）：git ls-files -i -c --exclude-standard
+
+# ── 依赖 ──
+/node_modules/
+
+# ── 构建产物（electron-builder 输出）──
+/dist/
+/dist-packs/
+/build/*
+!/build/icon.ico
+
+# ── Android 壳的构建产物（build.sh / build.ps1 生成）──
+/webview/android/build/
+/webview/android/bin/
+
+# 注意：webview/android/debug.keystore 是**故意入库**的 —— 它是公开的固定调试签名，
+# CI 用它保证「用户覆盖安装无需卸载重装」。它不含任何私密信息（口令就是 android）。
+# 生产签名走 GitHub Secret，见 .github/workflows/android-shell.yml。
+
+# ── 素材烘焙的中间物（都可从 Release / 上游重新拉）──
+# models/ 是下载的 Spine 模型原件，45 MB 且含第三方版权素材，绝不入库
+/models/
+/_ab2/
+/_ab3/
+/_ab4/
+/_dbg/
+/_export_lib.mjs
+/_bisect.ps1
+/_memprobe.*
+
+# ── 第三方版权素材：绝不入库（合规）──
+# 仓库里只保留自绘 chibi；其余角色包由 Release 按需下载，见 assets/packs-index.json
+/assets/packs/*
+!/assets/packs/chibi/
+
+# ── 调试期产物 ──
+*.log
+/_idx.txt
+/_q.js
+/_q2.js
+/docs/_beh*.log
+/docs/_beh*.err
+# 真机截图每个 1.4 MB，留在本地
+/docs/android_*.png

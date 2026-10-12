@@ -1,0 +1,115 @@
+name: Desktop (Electron)
+
+# cute-pet 桌面宿主：Electron + PixiJS 的 Windows 安装包（NSIS + MSI）。
+#
+# ⚠️ 所有产物一律由 CI 产出，本机不编译（本机只写代码）。
+#
+# 合规：安装包里只含自绘 chibi 素材。第三方版权角色素材（明日方舟 / 柚子社 /
+#       nctype）走运行时按需下载，见 assets/packs-index.json。
+#       verify_pack.sh 里有对应闸门。
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+      - '.gitattributes'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── 便宜门禁：语法与素材包结构。JSON 写错 / 行为表漏字段先在这里暴露， ──
+  # ── 而不是等到打完 100 MB 安装包才发现。                                  ──
+  check:
+    name: 语法与素材包结构
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: node --check（全部源文件与工具）
+        run: |
+          set -e
+          n=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "::error::语法错误 $f"; exit 1; }
+            n=$((n+1))
+          done < <(find src electron tools -name '*.js' -o -name '*.mjs' | sort)
+          echo "✅ $n 个文件语法通过"
+
+      - name: 素材包结构校验
+        run: bash scripts/verify_packs.sh
+
+  build-win:
+    name: 构建 Windows 安装包
+    needs: [check]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 生成应用图标
+        # 图标是自绘 chibi 转的 ICO（tools/make_icon.mjs，用 node-canvas）。
+        # 不入库二进制可以，但 electron-builder 要它 —— 所以构建期现生成。
+        run: node tools/make_icon.mjs
+
+      - name: 打包（NSIS + MSI）
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: 列出产物
+        run: Get-ChildItem dist -File | Select-Object Name,Length
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cute-pet-windows
+          path: |
+            dist/*.exe
+            dist/*.msi
+          if-no-files-found: error
+
+  # ── tag v* 时把安装包挂到 Release ──
+  release:
+    name: 挂载安装包到 Release
+    needs: [build-win]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cute-pet-windows
+          path: dist
+
+      - name: 挂到当前 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "cute-pet $TAG" --generate-notes
+          gh release upload "$TAG" dist/*.exe dist/*.msi --clobber
+          echo "✅ 已挂载到 $TAG"

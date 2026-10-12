@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "nctype-seyana",
+      "prefix": "nctype",
+      "name": "seyana",
+      "kind": "desktopseyana",
+      "version": "0.2.0",
+      "file": "nctype-seyana-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/nctype-seyana-0.2.0.tar.gz",
+      "bytes": 38542406,
+      "sha256": "2f3054dd95f702fb1ca756762ea8f8375af6c57968f7c973b41911a1f8b5c764",
+      "files": 3137,
+      "canvas": {
+        "width": 263,
+        "height": 263
+      },
+      "format": "frames",
+      "animations": 38,
+      "behaviors": true,
+      "license": "素材来自 nctype/DesktopSeyana（该仓库未声明 LICENSE）。版权归原作者。"
+    },
+    {
+      "id": "arknights-amiya",
+      "prefix": "arknights",
+      "name": "阿米娅",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-amiya-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-amiya-0.2.0.tar.gz",
+      "bytes": 3932119,
+      "sha256": "eb46a13e8f7dfc2348ee63e9491aa60a0324527f982f47accf8ef6284fb3477a",
+      "files": 115,
+      "canvas": {
+        "width": 239,
+        "height": 277
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-kal-tsit",
+      "prefix": "arknights",
+      "name": "凯尔希",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-kal-tsit-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-kal-tsit-0.2.0.tar.gz",
+      "bytes": 6484922,
+      "sha256": "7720c08d2d215bfeb9d6357f2c4b0ef43d72a752289bf3efa41aa736bd3342b9",
+      "files": 150,
+      "canvas": {
+        "width": 223,
+        "height": 268
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-exusiai",
+      "prefix": "arknights",
+      "name": "能天使",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-exusiai-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-exusiai-0.2.0.tar.gz",
+      "bytes": 4831633,
+      "sha256": "830a39a11cc79c5ea90053c4d964f7889efc98196a0fc573d8f17ae74ccc8cc4",
+      "files": 144,
+      "canvas": {
+        "width": 211,
+        "height": 267
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-silverash",
+      "prefix": "arknights",
+      "name": "银灰",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-silverash-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-silverash-0.2.0.tar.gz",
+      "bytes": 3973135,
+      "sha256": "281424be75434100ad792ff0956b2ae12dcc40929950913a993714b3088f0320",
+      "files": 102,
+      "canvas": {
+        "width": 222,
+        "height": 259
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-ch-en",
+      "prefix": "arknights",
+      "name": "陈",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-ch-en-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-ch-en-0.2.0.tar.gz",
+      "bytes": 2146428,
+      "sha256": "d798b6ccc13359d08a2ce87a95b49070ba314b0b89e21d72fa34c2be318f53a7",
+      "files": 71,
+      "canvas": {
+        "width": 206,
+        "height": 272
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-surtr",
+      "prefix": "arknights",
+      "name": "史尔特尔",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-surtr-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-surtr-0.2.0.tar.gz",
+      "bytes": 3164524,
+      "sha256": "459123478bea6c8ac4d6c4b4ccd4c7ab7512892b64f5eb71bb3b7c98ba579526",
+      "files": 163,
+      "canvas": {
+        "width": 226,
+        "height": 258
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-texas",
+      "prefix": "arknights",
+      "name": "德克萨斯",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-texas-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-texas-0.2.0.tar.gz",
+      "bytes": 3051096,
+      "sha256": "435b883bf5a3a99784066a967097530cf3f38a1e5ff00d8f1707c9bb7c148115",
+      "files": 91,
+      "canvas": {
+        "width": 216,
+        "height": 276
+      },
+      "format": "frames",
+      "animations": 7,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-lappland",
+      "prefix": "arknights",
+      "name": "拉普兰德",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-lappland-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-lappland-0.2.0.tar.gz",
+      "bytes": 2613887,
+      "sha256": "a798a6df74b05a73e622ad7fe473a7d575bb0a41681e5f60a03f13839b23253a",
+      "files": 70,
+      "canvas": {
+        "width": 217,
+        "height": 260
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-siege",
+      "prefix": "arknights",
+      "name": "推进之王",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-siege-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-siege-0.2.0.tar.gz",
+      "bytes": 2300899,
+      "sha256": "187be2065598f3a990dd81703d9df7886dd7a90bc2964287cdffa2e37409bfdd",
+      "files": 70,
+      "canvas": {
+        "width": 217,
+        "height": 272
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-eyjafjalla",
+      "prefix": "arknights",
+      "name": "艾雅法拉",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-eyjafjalla-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-eyjafjalla-0.2.0.tar.gz",
+      "bytes": 4029529,
+      "sha256": "6f6c2db57a61e82738f3ae3204c5e9bf3ccb848e998e1f2003e44c47b0c7be0e",
+      "files": 106,
+      "canvas": {
+        "width": 208,
+        "height": 258
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-saria",
+      "prefix": "arknights",
+      "name": "塞雷娅",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-saria-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-saria-0.2.0.tar.gz",
+      "bytes": 2595488,
+      "sha256": "7a08b0e5d10322822acc6fc7a0c244847437ee84e138e990cfe53bdcb4cc0f87",
+      "files": 70,
+      "canvas": {
+        "width": 223,
+        "height": 268
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-blaze",
+      "prefix": "arknights",
+      "name": "煌",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-blaze-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-blaze-0.2.0.tar.gz",
+      "bytes": 4275444,
+      "sha256": "721800dac10cf769be0bf825fc1d0c6ed8f1ef33fe06d3b0ce06e259287f098d",
+      "files": 120,
+      "canvas": {
+        "width": 261,
+        "height": 314
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-shining",
+      "prefix": "arknights",
+      "name": "闪灵",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-shining-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-shining-0.2.0.tar.gz",
+      "bytes": 2400034,
+      "sha256": "594ea7f45da9e7c67fc2de0efe4905ec7690f6726890380a925cf068b243a131",
+      "files": 71,
+      "canvas": {
+        "width": 232,
+        "height": 227
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-ethan",
+      "prefix": "arknights",
+      "name": "伊桑",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-ethan-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-ethan-0.2.0.tar.gz",
+      "bytes": 5043059,
+      "sha256": "8cb9e239c5c83bbd5cb7f84eb7d7748e6dbe253aab6468447f4d11300f040ddd",
+      "files": 197,
+      "canvas": {
+        "width": 225,
+        "height": 258
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-swire",
+      "prefix": "arknights",
+      "name": "诗怀雅",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-swire-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-swire-0.2.0.tar.gz",
+      "bytes": 2747879,
+      "sha256": "4bf940b043f29e0ad666f5efc5574ecafdc32d2f5c43a67e5041a86a4175eb4e",
+      "files": 71,
+      "canvas": {
+        "width": 233,
+        "height": 262
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-bison",
+      "prefix": "arknights",
+      "name": "拜松",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-bison-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-bison-0.2.0.tar.gz",
+      "bytes": 4276104,
+      "sha256": "f08496ae30da85e20ec5046c8c46d3ac450dbd0888086adcb24abfc056ff2041",
+      "files": 117,
+      "canvas": {
+        "width": 210,
+        "height": 272
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-shirayuki",
+      "prefix": "arknights",
+      "name": "白雪",
+      "kind": "spine",
+      "version": "0.2.0",
+      "file": "arknights-shirayuki-0.2.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet/releases/download/packs-0.2.0/arknights-shirayuki-0.2.0.tar.gz",
+      "bytes": 3232322,
+      "sha256": "b491452703e5d9fd117701695561af10d3ba3e50d20d52cf6f9ad888d86968c5",
+      "files": 117,
+      "canvas": {
+        "width": 206,
+        "height": 255
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    }
+  ]
+}

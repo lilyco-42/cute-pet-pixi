@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "id": "chibi.placeholder",
+  "format": "frames",
+  "canvas": {
+    "width": 128,
+    "height": 128
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 1
+  },
+  "hitThreshold": 90,
+  "source": {
+    "kind": "generated",
+    "note": "程序生成的占位 chibi（tools/gen_placeholder.py）"
+  },
+  "animations": {
+    "idle": {
+      "loop": true,
+      "directions": {
+        "0": {
+          "frames": [
+            {
+              "ticks": 8,
+              "name": "idle_00",
+              "layers": [
+                {
+                  "src": "frames/idle_00.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_01",
+              "layers": [
+                {
+                  "src": "frames/idle_01.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_02",
+              "layers": [
+                {
+                  "src": "frames/idle_02.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_03",
+              "layers": [
+                {
+                  "src": "frames/idle_03.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_04",
+              "layers": [
+                {
+                  "src": "frames/idle_04.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_05",
+              "layers": [
+                {
+                  "src": "frames/idle_05.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_06",
+              "layers": [
+                {
+                  "src": "frames/idle_06.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 8,
+              "name": "idle_07",
+              "layers": [
+                {
+                  "src": "frames/idle_07.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "id": "laic.noel",
+  "format": "frames",
+  "canvas": {
+    "width": 128,
+    "height": 128
+  },
+  "anchor": {
+    "x": 0.5,
+    "y": 1
+  },
+  "hitThreshold": 90,
+  "source": {
+    "kind": "laic",
+    "note": "Alice in Cradle / PixelLiner，由 tools/laic_import.mjs 归一化"
+  },
+  "animations": {
+    "idle": {
+      "loop": true,
+      "directions": {
+        "0": {
+          "frames": [
+            {
+              "ticks": 9,
+              "name": null,
+              "layers": [
+                {
+                  "src": "noel.idle.d0.f0.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "walk": {
+      "loop": true,
+      "directions": {
+        "0": {
+          "frames": [
+            {
+              "ticks": 3,
+              "name": null,
+              "layers": [
+                {
+                  "src": "noel.walk.d0.f0.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            },
+            {
+              "ticks": 5,
+              "name": null,
+              "layers": [
+                {
+                  "src": "noel.walk.d0.f1.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        },
+        "1": {
+          "frames": [
+            {
+              "ticks": 2,
+              "name": null,
+              "layers": [
+                {
+                  "src": "noel.walk.d1.f0.png",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

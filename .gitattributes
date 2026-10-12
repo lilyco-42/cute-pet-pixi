@@ -1,0 +1,42 @@
+# 统一换行符：仓库内一律 LF，检出时不做自动转换。
+# 理由：本仓跨 Windows / Linux / macOS / CI 构建，CRLF 会咬人 ——
+#   · shell 脚本带 CR 时 /bin/sh 报 "bad interpreter: /bin/bash^M"，CI 直接红；
+#   · 素材文件行尾漂移会让产物 hash 变化，进而让 packs-index.json 的 sha256 对不上。
+* text=auto eol=lf
+
+# 明确文本的扩展名
+*.js    text
+*.mjs   text
+*.json  text
+*.yml   text
+*.yaml  text
+*.md    text diff=markdown
+*.html  text
+*.css   text
+*.java  text
+*.gd    text
+*.gdshader text
+# 注意：.gitattributes 的行尾不能写注释（会被当成属性名而报错）。
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.sh    text eol=lf
+
+# 二进制：禁止行尾转换与 diff（否则 git 会试图把 PNG 当文本、污染 diff）
+*.png       binary
+*.ico       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.ttf       binary
+*.keystore  binary
+*.tar.gz    binary
+*.exe       binary
+*.msi       binary
+*.apk       binary
+*.skel      binary
+*.atlas     text
+
+# 让 GitHub 在语言统计里别把 vendored 运行时算进去
+vendor/**            linguist-vendored
+vendor/spine-3.8/**  linguist-vendored
+node_modules/**      linguist-vendored

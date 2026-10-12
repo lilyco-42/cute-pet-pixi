@@ -1,0 +1,156 @@
+name: Android WebView Shell
+
+# cute-pet 的 Android 悬浮窗壳：用 Android SDK 自带工具链（aapt2 + javac + d8 +
+# zipalign + apksigner）构建**纯 framework** 的 WebView 壳。
+# 不依赖 Gradle / androidx / 任何第三方库，因此无需联网拉依赖。
+#
+# ⚠️ 本 workflow 存在的理由之一就是「不在本机编译」：所有产物一律由 CI 产出，
+#    本机只负责写代码。产物 = cute-pet-shell.apk（CI artifact）。
+#
+# 合规：内置只有自绘 chibi；arknights-* / nctype-* / yuzusoft-* 等第三方版权角色素材
+#       一律走运行时按需下载（见 assets/packs-index.json），绝不编进 APK。
+#       verify_apk.sh 里有专门的合规闸门断言这一点。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'webview/android/**'
+      - 'src/**'
+      - 'assets/packs-index.json'
+      - 'assets/packs/chibi/**'
+      - 'package.json'
+      - '.github/workflows/android-shell.yml'
+  pull_request:
+    paths:
+      - 'webview/android/**'
+      - 'src/**'
+  workflow_dispatch:
+
+concurrency:
+  group: android-shell-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 便宜的门禁：Java 编译 + 静态检查。任何 API 名字写错先在这里暴露， ──
+  # ── 而不是等到打完 APK 才发现。                                            ──
+  check:
+    name: Java 编译与静态检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 安装 android.jar 与 build-tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+
+      - name: javac —— 三个类都必须编过
+        # 用 -encoding UTF-8：中文 Windows 上 javac 默认 GBK，UTF-8 源码会炸出 47 个错。
+        run: |
+          set -e
+          mkdir -p build/classes
+          javac -encoding UTF-8 -Xlint:all \
+            -classpath "${ANDROID_HOME}/platforms/android-36/android.jar" \
+            -d build/classes \
+            webview/android/src/rust/cute_pet/*.java
+          echo "✅ javac 通过"
+          ls -R build/classes | head -20
+
+      - name: 确认 index.html 里的桥与壳一致
+        # 壳和页面靠 window.PetBridge.postMessage(JSON) 通信。方法名在两边各写一遍，
+        # 漂移了只有真机跑起来才会发现 —— 这里静态比一下。
+        run: |
+          set -e
+          miss=0
+          for m in setClickThrough dragStart dragEnd resize quit log; do
+            grep -q "\"$m\"" webview/android/src/rust/cute_pet/OverlayService.java \
+              || { echo "::error::壳里缺方法 $m"; miss=1; }
+          done
+          for m in setClickThrough dragStart dragEnd resize; do
+            grep -rq "$m" src/ || { echo "::warning::页面侧没用过 $m"; }
+          done
+          [ "$miss" -eq 0 ] || exit 1
+          echo "✅ 桥方法对得上"
+
+  build-apk:
+    name: 构建壳 APK
+    needs: [check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 安装 SDK 组件
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装依赖（build.ps1 走 pwsh，这里用 bash 版）
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 构建 APK
+        run: bash webview/android/build.sh --sdk "$ANDROID_HOME"
+
+      - name: 产物校验（结构 / 合规 / 依赖 / 桥 / 权限 / 体积）
+        run: bash webview/android/verify_apk.sh webview/android/bin/cute-pet-shell.apk --selftest
+
+      - name: 体积与内容层（排查时要有数）
+        run: |
+          echo "APK: $(du -h webview/android/bin/cute-pet-shell.apk | cut -f1)"
+          echo "内容层:"
+          unzip -Z1 webview/android/bin/cute-pet-shell.apk | grep '^assets/web' | sed 's/^/  /' | head -30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cute-pet-shell-apk
+          path: webview/android/bin/cute-pet-shell.apk
+          if-no-files-found: error
+
+  # ── push main 时把 APK 挂到 Release（tag 与桌面线同源）──
+  release-apk:
+    name: 挂载 APK 到 Release
+    needs: [build-apk]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cute-pet-shell-apk
+          path: dist-shell
+
+      - name: 上 Release 前复查（与构建期同一脚本）
+        run: |
+          chmod +x webview/android/verify_apk.sh
+          bash webview/android/verify_apk.sh dist-shell/cute-pet-shell.apk
+
+      - name: 挂到 v<version>（存在才挂，避免 CI 自己造 tag）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          VER=$(node -p "require('./package.json').version")
+          TAG="v$VER"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist-shell/cute-pet-shell.apk --clobber
+            echo "✅ 已更新 $TAG 的壳 APK"
+          else
+            echo "::notice::Release $TAG 不存在，跳过挂载（产物在 artifact 里可下载）"
+          fi

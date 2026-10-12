@@ -1,0 +1,141 @@
+name: Bake Asset Packs
+
+# 把明日方舟的 Spine 模型批量烘焙成统一资产包（pack.json + frames/*.png），
+# 打成 <prefix>-<slug>-<ver>.tar.gz 并更新 assets/packs-index.json。
+#
+# ⚠️ 为什么放到 CI 而不是本机：
+#   1. 项目纪律要求：本机不编译、不烘焙。
+#   2. 重 mesh 模型（动态立绘 279 个 MeshAttachment）在本机 node-canvas 上会
+#      out of memory，而且与画布尺寸无关、只与累计帧数有关（cairo 原生内存）。
+#      runner 内存更宽裕，且能靠「一段动画一个进程」+ matrix 并行绕开累积。
+#
+# 合规：烘焙产物含鹰角网络版权角色素材，**只进 Release，绝不进仓库**
+#       （.gitignore 已把 assets/packs/* 挡掉，只留 chibi）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: '要烘焙的模型 key（逗号分隔，如 147_shining,2023_ling）'
+        required: true
+        type: string
+      kind:
+        description: 'operator=基建小人 / illust=动态立绘'
+        required: false
+        default: operator
+        type: choice
+        options: [operator, illust]
+      scale:
+        description: '缩放（小人 0.5 / 立绘 0.12）'
+        required: false
+        default: '0.5'
+        type: string
+      fps:
+        description: '帧率（ticks = 60/fps）'
+        required: false
+        default: '8'
+        type: string
+      version:
+        description: '包版本（写进文件名与索引）'
+        required: false
+        default: '0.2.0'
+        type: string
+
+concurrency:
+  group: bake-packs
+  cancel-in-progress: false
+
+jobs:
+  bake:
+    name: 烘焙 ${{ inputs.kind }} 素材包
+    runs-on: ubuntu-latest
+    # 重 mesh 模型吃内存；标准 runner 7 GB，给足堆。
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装依赖（node-canvas 需要系统图形库）
+        # node-canvas 在 Linux 上要 cairo/pango/jpeg/gif 的开发包才能编原生模块。
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential libcairo2-dev libpango1.0-dev \
+            libjpeg-dev libgif-dev librsvg2-dev
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          node -e "require('canvas'); console.log('node-canvas 可用')"
+
+      - name: 下载模型索引
+        run: |
+          set -e
+          mkdir -p _ark
+          curl -fsSL "https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models_data.json" -o _ark/models_data.json
+          node -e "const m=require('./_ark/models_data.json');console.log('模型索引: '+Object.keys(m.data).length+' 条')"
+
+      - name: 烘焙（一段动画一个进程，避开 cairo 累积）
+        # --recycle 缺省 0 是刻意的：实测「定期重建 canvas」是负优化
+        # （每次 createCanvas 新增一张 surface，只增不减，反而更早 OOM）。
+        run: |
+          node tools/arknights_batch.mjs \
+            --list "${{ inputs.models }}" \
+            --kind "${{ inputs.kind }}" \
+            --scale "${{ inputs.scale }}" \
+            --fps "${{ inputs.fps }}" \
+            --ver "${{ inputs.version }}" \
+            2>&1 | tee bake.log
+
+      - name: 汇总（有 FAIL 就红）
+        run: |
+          set -e
+          tail -30 bake.log
+          if grep -q 'FAIL' bake.log; then
+            echo "::error::有模型烘焙失败，见上方日志"
+            grep 'FAIL' bake.log
+            exit 1
+          fi
+
+      - name: 列出产物
+        run: |
+          du -sh assets/packs/* 2>/dev/null | sed 's/^/  /' || true
+          ls -la dist-packs/ | sed 's/^/  /' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baked-packs-${{ inputs.version }}
+          path: |
+            dist-packs/*.tar.gz
+            assets/packs-index.json
+          if-no-files-found: error
+
+      - name: 校验索引结构与命名约定
+        run: bash scripts/verify_packs.sh
+
+  publish:
+    name: 发布到 packs-${{ inputs.version }}
+    needs: [bake]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: baked-packs-${{ inputs.version }}
+          path: out
+
+      - name: 挂载（幂等 --clobber）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="packs-${{ inputs.version }}"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "素材包 packs-${{ inputs.version }}" \
+              --notes "按需下载的角色素材包。版权归各原作者，仅供个人学习，不得商用分发。"
+          gh release upload "$TAG" out/dist-packs/*.tar.gz --clobber
+          echo "已发布到 $TAG"
+          gh release view "$TAG" --json assets --jq '.assets | length' | sed 's/^/   Release 资产数: /'

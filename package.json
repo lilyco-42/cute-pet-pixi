@@ -1,0 +1,61 @@
+{
+  "name": "cute-pet",
+  "version": "0.2.0",
+  "private": true,
+  "description": "多素材兼容的跨平台桌宠（Electron + PixiJS）",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:debug": "electron . --dev",
+    "dist": "electron-builder --win nsis msi"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "top.lilyco.cutepet",
+    "productName": "cute-pet",
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "package.json",
+      "assets/packs/chibi/**/*",
+      "assets/packs-index.json",
+      "!assets/packs/amiya/**/*",
+      "!assets/packs/murasame/**/*",
+      "!assets/packs/seyana/**/*",
+      "!docs/**/*",
+      "!fixtures/**/*",
+      "!models/**/*",
+      "!vendor/**/*",
+      "!tools/**/*",
+      "!webview/**/*",
+      "!_ab/**/*",
+      "!dist/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "msi"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  },
+  "author": "lilyco-42"
+}

@@ -1,0 +1,53 @@
+{
+  "root": "D:/gal/AliceInCradle_Data/StreamingAssets",
+  "pose_filter": "walk*",
+  "matches": [
+    {
+      "file": "D:/gal/.../PxlNoel/noel.pxls.dat",
+      "pose": "walk",
+      "dirs": [
+        {
+          "dir": 0,
+          "frames": [
+            {
+              "index": 0,
+              "name": "w0",
+              "crf60": 3
+            },
+            {
+              "index": 1,
+              "name": "w1",
+              "crf60": 5
+            }
+          ]
+        },
+        {
+          "dir": 1,
+          "frames": [
+            {
+              "index": 0,
+              "name": "w0",
+              "crf60": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "D:/gal/.../PxlNoel/noel.pxls.dat",
+      "pose": "idle",
+      "dirs": [
+        {
+          "dir": 0,
+          "frames": [
+            {
+              "index": 0,
+              "name": "i0",
+              "crf60": 9
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
