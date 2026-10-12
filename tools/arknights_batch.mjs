@@ -55,7 +55,10 @@ async function main() {
   const scale = String(a.scale || (kind === 'illust' ? 0.12 : 0.5));
   const fps = String(a.fps || 8);
   const ver = String(a.ver || '0.0.0');
-  const baseUrl = a['base-url'] || 'https://github.com/lilyco-42/cute-pet/releases/download/packs-' + ver;
+  // 仓库改名/搬迁后这里必须跟着改：索引里的 url 是运行时唯一的下载来源，
+  // 指向旧仓库会让「按需下载」全部 404（而且运行时只表现为包加载失败）。
+  const repo = a.repo || process.env.PACKS_REPO || 'lilyco-42/cute-pet-pixi';
+  const baseUrl = a['base-url'] || 'https://github.com/' + repo + '/releases/download/packs-' + ver;
   const modelsDir = path.resolve(a.models || 'models');
   const packsIndex = path.resolve(a.packsIndex || 'assets/packs-index.json');
   const results = [];

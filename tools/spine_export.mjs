@@ -79,6 +79,11 @@ export async function loadModel(spine, modelDir, baseName) {
   // 此时 getAttachment() 对大量槽位返回 null —— 表现是导出的人物只剩残影/特效，
   // 本体整个消失。实测：德克萨斯动态立绘 333 个槽位里 49 个无附件（斯卡蒂 11/281）。
   // 这是「动态立绘人物不完整」的真正根因，与 mesh / 混合模式都无关。
+  if (process.argv.includes('--skin-probe')) {
+    console.error('SKINPROBE skins=' + JSON.stringify((data.skins || []).map(function (s) {
+      try { return s.name + '(' + (s.attachments ? s.attachments.length : '?') + ')'; } catch (e) { return s.name + '(err)'; }
+    })));
+  }
   if (data.skins && data.skins.length) {
     const want = data.skins.find((sk) => sk.name === 'default') || data.skins[0];
     try {

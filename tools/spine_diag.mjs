@@ -12,6 +12,14 @@ console.log('skins           :', (data.skins || []).map((s) => s.name).join(', '
 console.log('默认 skin       :', skeleton.skin ? skeleton.skin.name : '(none)');
 console.log('动画            :', (data.animations || []).map((a) => a.name).join(', '));
 console.log('槽位总数        :', (data.slots || []).length);
+console.log('skin 对象       :', JSON.stringify((data.skins || []).map(function (s) {
+  var n = 0;
+  try {
+    if (s.attachments) { for (var i = 0; i < s.attachments.length; i++) { var m = s.attachments[i]; if (m) { for (var k in m) n++; } } }
+  } catch (e) { n = -1; }
+  return s.name + ' attachments=' + n;
+})));
+console.log('skin.name 类型  :', data.skins && data.skins.length ? typeof data.skins[0].name : 'n/a');
 
 function filled() {
   const out = [];

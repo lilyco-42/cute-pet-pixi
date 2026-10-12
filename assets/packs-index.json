@@ -361,6 +361,186 @@
       "animations": 6,
       "behaviors": true,
       "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-skadi-the-corrupting-heart",
+      "prefix": "arknights",
+      "name": "浊心斯卡蒂",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-skadi-the-corrupting-heart-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-skadi-the-corrupting-heart-0.3.0.tar.gz",
+      "bytes": 16228736,
+      "sha256": "9d3e6e34227d0d9a170a9ab72864dbad25d405948a641033e5c5069e83ebd20e",
+      "files": 129,
+      "canvas": {
+        "width": 319,
+        "height": 252
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-ch-en-the-holungday",
+      "prefix": "arknights",
+      "name": "假日威龙陈",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-ch-en-the-holungday-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-ch-en-the-holungday-0.3.0.tar.gz",
+      "bytes": 4585358,
+      "sha256": "8175d5c4ddc4cf133f7e2c7e257e7f0e88e8f0ef732c6ff63c434e65d9246fc3",
+      "files": 181,
+      "canvas": {
+        "width": 230,
+        "height": 197
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-nearl-the-radiant-knight",
+      "prefix": "arknights",
+      "name": "耀骑士临光",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-nearl-the-radiant-knight-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-nearl-the-radiant-knight-0.3.0.tar.gz",
+      "bytes": 17886718,
+      "sha256": "da269c2c16e9a3509a56b0e0838e0338669f01fb0bc38cbddb7cba1c7cb87a39",
+      "files": 150,
+      "canvas": {
+        "width": 259,
+        "height": 273
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-eyjafjalla-the-hv-t-aska",
+      "prefix": "arknights",
+      "name": "纯烬艾雅法拉",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-eyjafjalla-the-hv-t-aska-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-eyjafjalla-the-hv-t-aska-0.3.0.tar.gz",
+      "bytes": 1330635,
+      "sha256": "12358d68da89d8799e4e0890d512d0425d6581e1aa12c8252f09726e33138d6f",
+      "files": 226,
+      "canvas": {
+        "width": 243,
+        "height": 208
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-specter-the-unchained",
+      "prefix": "arknights",
+      "name": "归溟幽灵鲨",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-specter-the-unchained-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-specter-the-unchained-0.3.0.tar.gz",
+      "bytes": 25190799,
+      "sha256": "0c684b01321eee4f633f915c270c7315ea6b6972c978ef10170518e5422f6341",
+      "files": 289,
+      "canvas": {
+        "width": 238,
+        "height": 234
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-texas-the-omertosa",
+      "prefix": "arknights",
+      "name": "缄默德克萨斯",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-texas-the-omertosa-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-texas-the-omertosa-0.3.0.tar.gz",
+      "bytes": 455475,
+      "sha256": "b17cb00aa18f516736bd48e58687610bbfc2936aef2ee1bb14e613f85cf48b40",
+      "files": 190,
+      "canvas": {
+        "width": 154,
+        "height": 163
+      },
+      "format": "frames",
+      "animations": 3,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-ling",
+      "prefix": "arknights",
+      "name": "令",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-ling-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-ling-0.3.0.tar.gz",
+      "bytes": 12833769,
+      "sha256": "5e36128700ffb5b2233d9016c3760dda96745d2453d50b40d9a7e3184390d770",
+      "files": 253,
+      "canvas": {
+        "width": 262,
+        "height": 275
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-typhon",
+      "prefix": "arknights",
+      "name": "提丰",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-typhon-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-typhon-0.3.0.tar.gz",
+      "bytes": 17789068,
+      "sha256": "366698af1b3a0c0c47f1d61113f47bd23b1463d5b1e0c83d6c2908ff38946a2c",
+      "files": 288,
+      "canvas": {
+        "width": 319,
+        "height": 295
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
+    },
+    {
+      "id": "arknights-kirin-r-yato",
+      "prefix": "arknights",
+      "name": "麒麟R夜刀",
+      "kind": "spine",
+      "version": "0.3.0",
+      "file": "arknights-kirin-r-yato-0.3.0.tar.gz",
+      "url": "https://github.com/lilyco-42/cute-pet-pixi/releases/download/packs-0.3.0/arknights-kirin-r-yato-0.3.0.tar.gz",
+      "bytes": 20761184,
+      "sha256": "552256d9f46b4560f637d5b8fe9399288559190ea4043bb84463a67bec27a1ec",
+      "files": 402,
+      "canvas": {
+        "width": 263,
+        "height": 245
+      },
+      "format": "frames",
+      "animations": 6,
+      "behaviors": true,
+      "license": "角色素材版权归鹰角网络；Spine Runtimes 需持有 Spine 授权。仅供个人学习，不得商用分发。"
     }
   ]
 }

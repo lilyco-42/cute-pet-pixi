@@ -154,3 +154,21 @@ jobs:
           gh release upload "$TAG" out/dist-packs/*.tar.gz --clobber
           echo "已发布到 $TAG"
           gh release view "$TAG" --json assets --jq '.assets | length' | sed 's/^/   Release 资产数: /'
+
+      - name: 把更新后的索引提交回仓库
+        # 关键：烘焙会更新 assets/packs-index.json（新增包 + sha256 + url），
+        # 但之前只作为 artifact 上传，**从未写回仓库** ——
+        # 结果运行时索引永远看不到新包，下载功能对新包完全失效。
+        run: |
+          set -e
+          cp out/assets/packs-index.json assets/packs-index.json
+          node -e "const i=require('./assets/packs-index.json');console.log('索引现有 '+i.packs.length+' 个包')"
+          if git diff --quiet -- assets/packs-index.json; then
+            echo '索引无变化，跳过提交'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add assets/packs-index.json
+          git commit -m "chore(packs): 更新素材索引（packs-${{ inputs.version }}）"
+          git push
