@@ -74,6 +74,23 @@ export async function loadModel(spine, modelDir, baseName) {
     throw new Error('找不到 .skel 或 .json: ' + modelDir);
   }
   const skeleton = new spine.Skeleton(data);
+  // 必须显式应用默认 skin！
+  // Spine 的 Skeleton 构造完成后 skeleton.skin 是 null（spine_diag 实测打印 (none)），
+  // 此时 getAttachment() 对大量槽位返回 null —— 表现是导出的人物只剩残影/特效，
+  // 本体整个消失。实测：德克萨斯动态立绘 333 个槽位里 49 个无附件（斯卡蒂 11/281）。
+  // 这是「动态立绘人物不完整」的真正根因，与 mesh / 混合模式都无关。
+  if (data.skins && data.skins.length) {
+    const want = data.skins.find((sk) => sk.name === 'default') || data.skins[0];
+    try {
+      skeleton.setSkin(want);
+      skeleton.setToSetupPose();
+    } catch (e) {
+      console.error('setSkin 失败: ' + e.message);
+    }
+    console.error('应用 skin: ' + want.name + '（共 ' + data.skins.length + ' 个候选）');
+  } else {
+    console.error('模型没有 skin，跳过');
+  }
   // A/B 用：把全部槽位压成 Normal，复现「忽略混合模式」的旧行为
   if (process.argv.includes('--no-blend')) {
     for (const s of data.slots) s.blendMode = 0;
