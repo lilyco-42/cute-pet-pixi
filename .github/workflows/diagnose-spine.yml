@@ -123,6 +123,17 @@ jobs:
           echo '--- 结果 ---'
           grep -E '帧 @|失败' probe.log || true
 
+      - name: PNG 自检（自写编码器的产物必须能被反解）
+        # 导出器绕开了 cairo 的 PNG 编码器自己封 PNG，所以必须独立验证：
+        # 能反解、尺寸一致、且不是全透明。否则问题会一路漏到运行时（画面空白）。
+        if: always()
+        run: |
+          if [ -d _diag/frames ]; then
+            node tools/verify_png.mjs _diag/frames
+          else
+            echo "(没有 _diag/frames，跳过)"
+          fi
+
       - name: 判定（复现 OOM 就红）
         run: |
           if grep -q 'out of memory' probe.log; then

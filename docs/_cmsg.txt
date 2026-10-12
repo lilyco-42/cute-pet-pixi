@@ -1,0 +1,27 @@
+fix(export): 自写 PNG 编码器绕开 cairo 的编码 bug（重 mesh 模型的真正解法）
+
+== 完整定位过程（每步都是 CI 实测，排除法）==
+
+| 假设 | 证据 | 结论 |
+|---|---|---|
+| 内存耗尽 | frame 0->14 rss 稳定 97 MB，heap 16 MB（16 GB 机器） | 排除 |
+| 画布尺寸超限 | scale 0.08~0.5 全部复现，197x219 也一样挂 | 排除 |
+| surface 状态坏 | 重建 canvas 后重试仍然失败 | 排除 |
+| 几何数据坏 | 91 附件 / 272 骨骼 / 0 非有限值 / maxAbs 216~894 全正常 | 排除 |
+| **cairo PNG 编码器** | 同帧 getImageData 完全正常（17214 个不透明像素），toBuffer 却抛 OOM | **确认** |
+
+关键判别实验（--png-probe）：在 toBuffer 之前先 getImageData。
+  - 若 getImageData 也挂 -> surface 有问题
+  - 若它过而 toBuffer 挂 -> PNG 编码器的问题   <- 实测就是这个
+
+== 解法 ==
+
+像素数据是好的，就绕开 cairo 的编码器，自己封 PNG：
+  IHDR + IDAT(zlib.deflateSync) + IEND，每行加 filter 字节 0(None)。
+CRC32 按 PNG 规范（多项式 0xEDB88320）显式实现，不依赖 node 版本。
+
+新增 tools/verify_png.mjs：独立反解产物，验证「能读 + 尺寸对 + 非全透明」。
+自己写的东西必须被独立验证，否则会产出「能生成但读不了」的文件，
+一路漏到运行时只表现为画面空白。已接进诊断 workflow（if: always()）。
+
+注：--images-only 与 --self-png=false 仍可回退到 cairo 路径，便于 A/B 对照。

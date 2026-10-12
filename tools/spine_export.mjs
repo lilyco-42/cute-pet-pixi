@@ -11,6 +11,7 @@
 // 用法：
 //   node tools/spine_export.mjs --model <dir> --out <packdir> [--scale 0.5] [--fps 10] [--anim A,B] [--list]
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
@@ -127,7 +128,54 @@ export function scanBounds(spine, skeleton, data, name, fps, maxFrames) {
 }
 
 // 第二遍：按统一包围盒渲染
-export function renderAnimation(spine, skeleton, data, name, opts) {
+export // 自己写 PNG，绕开 cairo 的编码器。
+//
+// 背景：重 mesh 模型（如令的 Move）在第 14 帧会让 canvas.toBuffer("image/png") 抛
+// out of memory，但同一帧的 ctx.getImageData() 完全正常（实测 17214 个不透明像素）。
+// 已排除内存/尺寸/surface/几何四个假设，所以问题在 cairo 的 PNG 编码器。
+// 像素是好的，就直接自己封 PNG：IHDR + IDAT(zlib) + IEND。
+function encodePng(width, height, rgba) {
+  const stride = width * 4;
+  // 每行前面加一个 filter 字节（0 = None）
+  const raw = Buffer.alloc((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (stride + 1)] = 0;
+    Buffer.from(rgba.buffer, rgba.byteOffset + y * stride, stride).copy(raw, y * (stride + 1) + 1);
+  }
+  const idat = zlib.deflateSync(raw, { level: 6 });
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length, 0);
+    const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body) >>> 0, 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;   // bit depth
+  ihdr[9] = 6;   // color type: RGBA
+  ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr), chunk("IDAT", idat), chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+// PNG 的 CRC32（多项式 0xEDB88320，与 zlib.crc32 同义但显式实现以免依赖版本）
+let CRC_TABLE = null;
+function crc32(buf) {
+  if (!CRC_TABLE) {
+    CRC_TABLE = new Int32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      CRC_TABLE[n] = c;
+    }
+  }
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function renderAnimation(spine, skeleton, data, name, opts) {
   const { fps, scale, bounds, total, prefix } = opts;
   const cw = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * scale));
   const ch = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * scale));
@@ -226,7 +274,13 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
                   const maxV = maxAbs, maxB = maxAbsB;
           console.error('GEO frame=' + i + ' 附件=' + nAtt + ' 骨骼=' + nBone + ' 非有限顶点=' + badV + ' 非有限骨骼=' + badB + ' 顶点maxAbs=' + maxV + ' 骨骼maxAbs=' + maxB);
         }
-        png = canvas.toBuffer('image/png');
+        if (opts.selfPng !== false) {
+          // 默认走自写 PNG：cairo 的编码器在重 mesh 模型上会误报 OOM
+          const img = ctx.getImageData(0, 0, cw, ch);
+          png = encodePng(cw, ch, img.data);
+        } else {
+          png = canvas.toBuffer('image/png');
+        }
       } catch (e) {
         console.error('SEG frame=' + i + ' stage=' + stage + ' canvas=' + cw + 'x' + ch + ' attempt=' + attempt + ' err=' + e.message);
         if (attempt === 1) throw e;
