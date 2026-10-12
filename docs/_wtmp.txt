@@ -1,0 +1,9 @@
+fix(ci): diagnose workflow 的模板变量写成了字面量
+
+上一版把 ${{ inputs.model }} 写成了字面量，于是 CI 里 MK 变量被设成了
+" inputs.model }}"，报「索引里没有  inputs.model }}」。
+
+改用 env 传参（${{ inputs.X }} 赋值给环境变量），run 里只引用 $VAR：
+既避开多行 node -e 里的引号地狱，也让日志可读。
+
+顺带改进下载失败时的提示：列出相近的 key，方便发现拼错。

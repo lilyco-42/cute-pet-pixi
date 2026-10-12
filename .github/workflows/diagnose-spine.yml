@@ -2,9 +2,9 @@ name: Diagnose Spine
 
 # 在 CI 上跑 Spine 导出器的诊断（内存曲线 / 模型规模 / A-B 对比）。
 #
-# ⚠️ 为什么诊断也放 CI：项目纪律要求本机不运行、不编译。
-#    而且重 mesh 模型的 out of memory 在 CI 上同样复现（Linux + 7GB），
-#    说明不是本机内存不足，而是要在这里定位。
+# 为什么诊断也放 CI：项目纪律要求本机不运行、不编译。
+# 而且重 mesh 模型的 out of memory 在 CI 上同样复现（Linux + 7GB），
+# 说明不是本机内存不足，而是要在这里定位。
 
 on:
   workflow_dispatch:
@@ -71,42 +71,55 @@ jobs:
           echo "CPU: $(nproc) 核"
 
       - name: 下载模型
+        env:
+          MK: ${{ inputs.model }}
         run: |
           set -e
           mkdir -p _ark models
           curl -fsSL https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models_data.json -o _ark/models_data.json
           node -e "
-            const fs=require('fs');
-            const m=JSON.parse(fs.readFileSync('_ark/models_data.json','utf8'));
-            const k='${D} inputs.model }}';
-            const e=m.data[k];
-            if(!e){console.error('索引里没有 '+k);process.exit(1);}
-            console.log(k+' => '+e.name+' / '+e.appellation);
-            fs.mkdirSync('models/'+k,{recursive:true});
-            for(const f of Object.values(e.assetList)){
-              const url='https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/'+encodeURIComponent(k)+'/'+encodeURIComponent(f);
-              console.log('  '+f);
-              require('child_process').execSync('curl -fsSL -o \"models/'+k+'/'+f+'\" \"'+url+'\"');
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('_ark/models_data.json', 'utf8'));
+            const k = process.env.MK;
+            const e = m.data[k];
+            if (!e) {
+              const near = Object.keys(m.data).filter((x) => x.startsWith(k)).slice(0, 5);
+              console.error('索引里没有 ' + k + '，相近的有: ' + near.join(', '));
+              process.exit(1);
+            }
+            console.log(k + ' => ' + e.name + ' / ' + e.appellation);
+            fs.mkdirSync('models/' + k, { recursive: true });
+            for (const f of Object.values(e.assetList)) {
+              const url = 'https://raw.githubusercontent.com/isHarryh/Ark-Models/main/models/' + encodeURIComponent(k) + '/' + encodeURIComponent(f);
+              console.log('  下载 ' + f);
+              require('child_process').execFileSync('curl', ['-fsSL', '-o', 'models/' + k + '/' + f, url], { stdio: 'inherit' });
             }
           "
 
       - name: 模型规模（mesh 数 / 贴图 / 约束）
-        run: node tools/spine_diag.mjs --model "models/${D} inputs.model }}" || true
+        run: node tools/spine_diag.mjs --model models/${{ inputs.model }} || true
 
       - name: 内存曲线（关键：判别累积 vs 尖峰）
+        env:
+          MODEL: ${{ inputs.model }}
+          ANIM: ${{ inputs.anim }}
+          SCALE: ${{ inputs.scale }}
+          FPS: ${{ inputs.fps }}
+          PROBE: ${{ inputs.probe }}
+          IMGONLY: ${{ inputs.images_only }}
         run: |
           set -e
-          ARGS="--model models/${D} inputs.model }} --out _diag --scale ${D} inputs.scale }} --fps ${D} inputs.fps }} --mem-probe ${D} inputs.probe }}"
-          if [ -n "${D} inputs.anim }}" ]; then ARGS="$ARGS --anim ${D} inputs.anim }}"; fi
-          if [ "${D} inputs.images_only }}" = "true" ]; then ARGS="$ARGS --images-only"; echo '::warning::images-only 模式：所有 mesh 被跳过'; fi
-          echo "node tools/spine_export.mjs $ARGS"
+          ARGS="--model models/$MODEL --out _diag --scale $SCALE --fps $FPS --mem-probe $PROBE"
+          [ -n "$ANIM" ] && ARGS="$ARGS --anim $ANIM"
+          [ "$IMGONLY" = "true" ] && { ARGS="$ARGS --images-only"; echo '::warning::images-only 模式：所有 mesh 被跳过'; }
+          echo "运行: node tools/spine_export.mjs $ARGS"
           node tools/spine_export.mjs $ARGS 2>&1 | tee probe.log || true
-          echo '--- MEM 行 ---'
-          grep 'MEM ' probe.log || echo '(无 MEM 输出)';
+          echo '--- MEM 采样 ---'
+          grep 'MEM ' probe.log || echo '(无 MEM 输出)'
           echo '--- 结果 ---'
           grep -E '帧 @|失败' probe.log || true
 
-      - name: 判定（有 OOM 就红，便于定位）
+      - name: 判定（复现 OOM 就红）
         run: |
           if grep -q 'out of memory' probe.log; then
             LAST=$(grep 'MEM ' probe.log | tail -1)
@@ -118,6 +131,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: diagnose-${D} inputs.model }}-${{ inputs.anim || 'all' }}
+          name: diagnose-${{ inputs.model }}-${{ inputs.anim || 'all' }}
           path: probe.log
           if-no-files-found: warn
