@@ -163,6 +163,12 @@ export function renderAnimation(spine, skeleton, data, name, opts) {
     ctx.clearRect(0, 0, cw, ch);
     ctx.setTransform(scale, 0, 0, scale, -bounds.minX * scale, -bounds.minY * scale);
     renderer.draw(skeleton);
+    // 内存探针：区分「逐帧累积」还是「单帧尖峰」。
+    // 只有在 --mem-probe N 时才打印，默认零开销。
+    if (opts.memProbe && (i % Number(opts.memProbe) === 0 || i === total - 1)) {
+      const m = process.memoryUsage();
+      console.error("MEM frame=" + i + " rss=" + (m.rss/1048576).toFixed(1) + "M heap=" + (m.heapUsed/1048576).toFixed(1) + "M ext=" + (m.external/1048576).toFixed(1) + "M");
+    }
     frames.push({ file: prefix + '_' + String(i).padStart(3, '0') + '.png', canvas: canvas.toBuffer('image/png') });
     advance(state, skeleton, fps);
   }
@@ -233,7 +239,8 @@ async function main() {
     const res = renderAnimation(spine, skeleton, data, name, {
       fps, scale, bounds, total, prefix: name,
       imagesOnly: !!a['images-only'],   // 诊断开关：复现「只画 region、丢掉 mesh」的旧行为
-      recycle: a.recycle,               // 每 N 帧重建 canvas；重 mesh 模型要给 1
+      recycle: a.recycle,
+      memProbe: a['mem-probe'],               // 每 N 帧重建 canvas；重 mesh 模型要给 1
     });
     for (const f of res.frames) fs.writeFileSync(path.join(outDir, 'frames', f.file), f.canvas);
     animations[name] = {
