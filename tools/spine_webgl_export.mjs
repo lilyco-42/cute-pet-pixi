@@ -106,11 +106,22 @@ async function main() {
   await win.loadFile(path.join(HERE, 'spine_webgl_bake.html'));
 
   // 注入 spine-webgl 运行时（与 canvas 路径同一个 3.8.95 tag，保证版本一致）
-  const core = fs.readFileSync(path.join(VENDOR, 'spine-core.js'), 'utf8');
-  const webgl = fs.readFileSync(path.join(VENDOR, 'spine-webgl.js'), 'utf8');
+  // ⚠️ 三个 vendor 文件都以 '//# sourceMappingURL=...' 结尾且**没有末尾换行**。
+  // 直接拼接会把后面的代码接到这条注释行上，整段被静默吞掉 ——
+  // 表现是 spine 对象为空，注入“成功”但什么都拿不到。必须补换行。
+  const readJs = (f) => {
+    const s = fs.readFileSync(path.join(VENDOR, f), 'utf8');
+    return s.endsWith('\n') ? s : s + '\n';
+  };
+  const core = readJs('spine-core.js');
+  const webgl = readJs('spine-webgl.js');
   await win.webContents.executeJavaScript(
-    '(function(){ var spine = {}; ' + core + ' ' + webgl + ' window.__SPINE__ = spine; return true; })()'
-  );
+    '(function(){ var spine = {}; ' + core + webgl +
+    ' window.__SPINE__ = spine; return !!(spine.SkeletonBinary && spine.webgl && spine.webgl.SkeletonRenderer); })()'
+  ).then((okInject) => {
+    if (!okInject) throw new Error('spine 运行时注入不完整（缺 SkeletonBinary 或 SkeletonRenderer）');
+  });
+  console.log('运行时注入成功');
 
   const ok = await win.webContents.executeJavaScript('window.__ready === true');
   if (!ok) throw new Error('烘焙页没有就绪（spine 注入失败？）');
