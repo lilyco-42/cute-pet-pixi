@@ -25,52 +25,15 @@
   });
 
   window.__bake = async function (job) {
-    var spine = window.__SPINE__;
-    if (!spine) throw new Error('spine 运行时未注入');
-
-    var canvas = document.getElementById('c');
+    var ctx = window.__CTX;
+    if (!ctx) throw new Error('必须先调用 __prepare（上下文与纹理只建一次）');
+    var spine = ctx.spine;
+    var canvas = ctx.canvas;
+    var context = ctx.context;
+    var renderer = ctx.renderer;
+    var data = ctx.data;
     canvas.width = job.canvasW;
     canvas.height = job.canvasH;
-
-    // SceneRenderer(canvas, context[, twoColorTint])
-    //   它内部会建 ManagedWebGLRenderingContext、PolygonBatcher、SkeletonRenderer，
-    //   并把 MVP 矩阵与 shader 都接好 —— 比自己拼这些原语可靠得多。
-    //   twoColorTint 取 false：明日方舟模型没有双色染色需求，
-    //   开着会让顶点布局多一组颜色属性。
-    var context = new spine.webgl.ManagedWebGLRenderingContext(canvas, {
-      alpha: true,
-      premultipliedAlpha: true,
-      preserveDrawingBuffer: true,   // 必须：否则 readPixels 拿不到刚画的内容
-      antialias: false,
-    });
-    var renderer = new spine.webgl.SceneRenderer(canvas, context, false);
-
-    // 贴图：宿主已把 PNG 变成 dataURL，这里解码成 GL 纹理
-    var textures = {};
-    var pages = Object.keys(job.pngByPage || {});
-    for (var pi = 0; pi < pages.length; pi++) {
-      var page = pages[pi];
-      var img = await new Promise(function (res, rej) {
-        var im = new Image();
-        im.onload = function () { res(im); };
-        im.onerror = function () { rej(new Error('贴图解码失败 ' + page)); };
-        im.src = job.pngByPage[page];
-      });
-      // 必须用 spine.webgl.GLTexture，不能拿裸 gl.createTexture() 糊一个对象。
-      // TextureAtlas 内部会调 texture.setFilters(...) / setWraps(...)，
-      // 手写的替身没有这些方法 —— 报 'Cannot read properties of null
-      // (reading setFilters)'（实测踩到，白跑一轮 CI）。
-      // GLTexture 还会把自己注册进 context.restorables，上下文重建时能恢复。
-      textures[page] = new spine.webgl.GLTexture(context, img, false);
-    }
-
-    var atlas = new spine.TextureAtlas(job.atlasText, function (path) {
-      return textures[path] || textures[path.split('/').pop()];
-    });
-    var factory = new spine.AtlasAttachmentLoader(atlas);
-    var bin = Uint8Array.from(atob(job.skelB64), function (c) { return c.charCodeAt(0); });
-    var data = new spine.SkeletonBinary(factory).readSkeletonData(bin);
-    log('version=' + data.version + ' anims=' + data.animations.length + ' skins=' + (data.skins ? data.skins.length : 0));
 
     var skeleton = new spine.Skeleton(data);
     if (data.skins && data.skins.length) {
@@ -136,14 +99,47 @@
     return { frames: frames, width: job.canvasW, height: job.canvasH, clipping: clipping, mesh: mesh };
   };
 
-  function readData(spine, skelB64, atlasText) {
-    var loader = new spine.AtlasAttachmentLoader(new spine.TextureAtlas(atlasText, function () { return null; }));
+  // 从 dataURL 建 GL 纹理。TextureAtlas 内部会对返回的对象调
+  // setFilters()/setWraps()，所以**必须**返回真的 GLTexture ——
+  // 返回 null 会报 'Cannot read properties of null (reading setFilters)'
+  // （实测踩到，而且因为探针也叫 TextureAtlas，害我误判了一轮）。
+  async function makeTextures(spine, context, pngByPage) {
+    var textures = {};
+    var pages = Object.keys(pngByPage || {});
+    for (var i = 0; i < pages.length; i++) {
+      var page = pages[i];
+      var img = await new Promise(function (res, rej) {
+        var im = new Image();
+        im.onload = function () { res(im); };
+        im.onerror = function () { rej(new Error('贴图解码失败 ' + page)); };
+        im.src = pngByPage[page];
+      });
+      textures[page] = new spine.webgl.GLTexture(context, img, false);
+    }
+    return textures;
+  }
+
+  function buildData(spine, skelB64, atlasText, textures) {
+    var loader = new spine.AtlasAttachmentLoader(new spine.TextureAtlas(atlasText, function (path) {
+      return textures[path] || textures[path.split('/').pop()];
+    }));
     var bin = Uint8Array.from(atob(skelB64), function (c) { return c.charCodeAt(0); });
     return new spine.SkeletonBinary(loader).readSkeletonData(bin);
   }
 
-  window.__probe = function (skelB64, atlasText) {
-    var data = readData(window.__SPINE__, skelB64, atlasText);
+  // 宿主调用：一次建立上下文 + 纹理，然后跑 probe/animInfo/bake，避免重复开销。
+  window.__prepare = async function (job) {
+    var spine = window.__SPINE__;
+    var canvas = document.getElementById('c');
+    canvas.width = job.canvasW;
+    canvas.height = job.canvasH;
+    var context = new spine.webgl.ManagedWebGLRenderingContext(canvas, {
+      alpha: true, premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false,
+    });
+    var textures = await makeTextures(spine, context, job.pngByPage);
+    var data = buildData(spine, job.skelB64, job.atlasText, textures);
+    var renderer = new spine.webgl.SceneRenderer(canvas, context, false);
+    window.__CTX = { spine: spine, canvas: canvas, context: context, data: data, renderer: renderer };
     return {
       version: data.version,
       anims: data.animations.map(function (a) { return a.name; }),
@@ -153,13 +149,15 @@
   // 取某段动画的时长与「整段动画的包围盒」——包围盒必须逐帧扫，
   // 不能只看 setup pose（角色抬手/跳跃时 bbox 会超出 setup pose 很多，
   // 只看 setup pose 会把动作裁掉）。与 canvas 路径的 scanBounds 同口径。
-  window.__animInfo = function (skelB64, atlasText, animName) {
-    var spine = window.__SPINE__;
-    var data = readData(spine, skelB64, atlasText);
+  window.__animInfo = function (animName, fps) {
+    var ctx = window.__CTX;
+    if (!ctx) throw new Error('必须先调用 __prepare');
+    var spine = ctx.spine;
+    var data = ctx.data;
+    var useFps = fps || 8;
     var anim = data.animations.find(function (a) { return a.name === animName; }) || data.animations[0];
     var duration = anim.duration;
-    var fps = 8;
-    var total = Math.max(1, Math.round(duration * fps));
+    var total = Math.max(1, Math.round(duration * useFps));
     var skeleton = new spine.Skeleton(data);
     if (data.skins && data.skins.length) {
       skeleton.setSkin(data.skins.find(function (s) { return s.name === 'default'; }) || data.skins[0]);
@@ -196,7 +194,7 @@
           }
         }
       }
-      st.update(1 / fps);
+      st.update(1 / useFps);
     }
     if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 100; maxY = 100; }
     return { duration: duration, total: total,

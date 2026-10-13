@@ -148,13 +148,15 @@ async function main() {
   const outDir = path.resolve(a.out || path.join(modelDir, 'pack-webgl'));
   fs.mkdirSync(path.join(outDir, 'frames'), { recursive: true });
 
+  // __prepare 建上下文 + 纹理 + 解析 skeleton，只做一次。
+  // 探针与烘焙都复用 window.__CTX，避免重复建 GL 上下文（很贵）。
   let probe;
   try {
     probe = await win.webContents.executeJavaScript(
-      'window.__probe(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ')');
+      'window.__prepare(' + JSON.stringify({ skelB64, atlasText, pngByPage, canvasW: 16, canvasH: 16 }) + ')');
   } catch (e) {
     // 页面里抛的错被 Electron 包成一句无信息的话，真正的错误在转发出来的 [page] 行里
-    throw new Error('__probe 失败（看上面的 [page] 行）: ' + e.message);
+    throw new Error('__prepare 失败（看上面的 [page] 行）: ' + e.message);
   }
   console.log('  版本 ' + probe.version + ' | 动画: ' + probe.anims.join(', '));
 
@@ -165,7 +167,7 @@ async function main() {
 
   for (const name of animNames) {
     const info = await win.webContents.executeJavaScript(
-      'window.__animInfo(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ',' + JSON.stringify(name) + ')');
+      'window.__animInfo(' + JSON.stringify(name) + ',' + fps + ')');
     let total = Math.max(1, Math.round(info.duration * fps));
     if (a['max-frames'] && Number(a['max-frames']) > 0) total = Math.min(total, Number(a['max-frames']));
 
