@@ -56,16 +56,12 @@
         im.onerror = function () { rej(new Error('贴图解码失败 ' + page)); };
         im.src = job.pngByPage[page];
       });
-      var gl = context.gl;
-      var tex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      textures[page] = { getTexture: function () { return tex; } };
+      // 必须用 spine.webgl.GLTexture，不能拿裸 gl.createTexture() 糊一个对象。
+      // TextureAtlas 内部会调 texture.setFilters(...) / setWraps(...)，
+      // 手写的替身没有这些方法 —— 报 'Cannot read properties of null
+      // (reading setFilters)'（实测踩到，白跑一轮 CI）。
+      // GLTexture 还会把自己注册进 context.restorables，上下文重建时能恢复。
+      textures[page] = new spine.webgl.GLTexture(context, img, false);
     }
 
     var atlas = new spine.TextureAtlas(job.atlasText, function (path) {
