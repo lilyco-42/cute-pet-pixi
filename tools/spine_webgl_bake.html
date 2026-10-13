@@ -1,142 +1,213 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>spine-webgl 离屏烘焙</title></head>
 <body style="margin:0;background:#000">
-<!--
-  spine-webgl 离屏烘焙页
+<canvas id="c" width="16" height="16" style="display:block"></canvas>
 
-  为什么需要它：
-    spine-canvas（2D canvas 后端）只解析 ClippingAttachment，**没有任何 stencil 实现**
-    （实测：spine-canvas.js 里 'stencil' 出现 0 次），所以模型里的遮罩被静默忽略。
-    spine-webgl 的 Clipping 出现 38 次、blendMode 16 次 —— 走 GPU stencil，能力完整。
+<script>
+// spine-webgl 运行时由宿主（Electron）注入到 window.__SPINE__。
+// 这个页面不用 type=module：vendor 运行时是全局 var spine 的 UMD 风格，
+// 用 module 会拿不到它。
 
-  为什么用 Electron 而不是 node + headless-gl：
-    项目本来就依赖 Electron（它自带 Chromium = 真实 GL 上下文），
-    不需要再引 node-gyp / headless-gl 那套原生编译。
-
-  与 canvas 路径的关系：
-    两条路径并存。canvas 快、无 GPU 依赖，是默认；webgl 用于需要 clipping /
-    复杂混合模式的模型。用 --renderer 选择。
--->
-<canvas id="c" width="16" height="16"></canvas>
-<pre id="log" style="position:fixed;left:0;top:0;color:#0f0;font:11px monospace;margin:0;padding:4px;max-height:100%;overflow:hidden"></pre>
-
-<script type="module">
-// 这个页面由 tools/spine_webgl_export.mjs 通过 Electron 加载。
-// 契约：window.__bake(job) -> Promise<{frames:[Uint8Array], width, height}>
-//
-// 关键约束（都是实测踩出来的）：
-//   1. spine-webgl 的 SkeletonRenderer 要 WebGLRenderingContext，不能是 2D。
-//   2. 每个动画序列化后单独跑一遍：Spine 的 AnimationState 会改 skeleton 的 pose，
-//      复用同一个 skeleton 跨动画会串状态。
-//   3. TriangleRendering 与包内其它渲染器无关，spine-webgl 默认就画 mesh。
-//   4. 读回像素必须在同一帧内：WebGL 的 drawingBuffer 在合成后会被清（preserveDrawingBuffer:false）。
-//      所以渲染后立刻 readPixels，不要跨 rAF。
-
-const logEl = document.getElementById('log');
-const lines = [];
-function log(...a) {
-  const s = a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ');
-  lines.push(s);
-  if (lines.length > 8) lines.shift();
-  logEl.textContent = lines.join('\n');
-  console.log('[bake] ' + s);
-}
-window.addEventListener('error', (e) => log('ERROR ' + e.message));
-window.addEventListener('unhandledrejection', (e) => log('REJECT ' + String(e.reason && e.reason.message || e.reason)));
-
-// Spine 运行时由宿主通过 electron 注入（见 driver：预加载并执行）
-const SPINE = window.__SPINE__;
-
-function makeCanvasGL(w, h) {
-  const canvas = document.getElementById('c');
-  canvas.width = w;
-  canvas.height = h;
-  const gl = canvas.getContext('webgl', {
-    alpha: true,
-    premultipliedAlpha: true,
-    preserveDrawingBuffer: true,   // 必须：否则 readPixels 拿不到刚画的内容
-    antialias: false,
+(function () {
+  var logs = [];
+  function log() {
+    var s = Array.prototype.map.call(arguments, function (x) {
+      return typeof x === 'string' ? x : JSON.stringify(x);
+    }).join(' ');
+    logs.push(s);
+    if (logs.length > 20) logs.shift();
+    console.log('[bake] ' + s);
+  }
+  window.__logs = logs;
+  window.addEventListener('error', function (e) { log('ERROR ' + e.message); });
+  window.addEventListener('unhandledrejection', function (e) {
+    log('REJECT ' + String((e.reason && e.reason.message) || e.reason));
   });
-  if (!gl) throw new Error('无法创建 WebGL 上下文');
-  return { canvas, gl };
-}
 
-window.__bake = async function (job) {
-  // job = { base, atlasText, pngByPage: {name: dataURL}, bounds, scale, fps, total, name, anim }
-  const spine = window.__SPINE__;
-  const { canvas, gl } = makeCanvasGL(job.canvasW, job.canvasH);
+  window.__bake = async function (job) {
+    var spine = window.__SPINE__;
+    if (!spine) throw new Error('spine 运行时未注入');
 
-  // 材质：把预载的 PNG dataURL 变成 GL 纹理
-  const texLoader = new spine.AssetManager(gl);
-  const textures = {};
-  for (const [page, dataUrl] of Object.entries(job.pngByPage || {})) {
-    const img = await new Promise((res, rej) => {
-      const im = new Image();
-      im.onload = () => res(im);
-      im.onerror = () => rej(new Error('贴图解码失败 ' + page));
-      im.src = dataUrl;
+    var canvas = document.getElementById('c');
+    canvas.width = job.canvasW;
+    canvas.height = job.canvasH;
+
+    // SceneRenderer(canvas, context[, twoColorTint])
+    //   它内部会建 ManagedWebGLRenderingContext、PolygonBatcher、SkeletonRenderer，
+    //   并把 MVP 矩阵与 shader 都接好 —— 比自己拼这些原语可靠得多。
+    //   twoColorTint 取 false：明日方舟模型没有双色染色需求，
+    //   开着会让顶点布局多一组颜色属性。
+    var context = new spine.webgl.ManagedWebGLRenderingContext(canvas, {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true,   // 必须：否则 readPixels 拿不到刚画的内容
+      antialias: false,
     });
-    textures[page] = texLoader.loadTexture(img, false);
+    var renderer = new spine.webgl.SceneRenderer(canvas, context, false);
+
+    // 贴图：宿主已把 PNG 变成 dataURL，这里解码成 GL 纹理
+    var textures = {};
+    var pages = Object.keys(job.pngByPage || {});
+    for (var pi = 0; pi < pages.length; pi++) {
+      var page = pages[pi];
+      var img = await new Promise(function (res, rej) {
+        var im = new Image();
+        im.onload = function () { res(im); };
+        im.onerror = function () { rej(new Error('贴图解码失败 ' + page)); };
+        im.src = job.pngByPage[page];
+      });
+      var gl = context.gl;
+      var tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      textures[page] = { getTexture: function () { return tex; } };
+    }
+
+    var atlas = new spine.TextureAtlas(job.atlasText, function (path) {
+      return textures[path] || textures[path.split('/').pop()];
+    });
+    var factory = new spine.AtlasAttachmentLoader(atlas);
+    var bin = Uint8Array.from(atob(job.skelB64), function (c) { return c.charCodeAt(0); });
+    var data = new spine.SkeletonBinary(factory).readSkeletonData(bin);
+    log('version=' + data.version + ' anims=' + data.animations.length + ' skins=' + (data.skins ? data.skins.length : 0));
+
+    var skeleton = new spine.Skeleton(data);
+    if (data.skins && data.skins.length) {
+      skeleton.setSkin(data.skins.find(function (s) { return s.name === 'default'; }) || data.skins[0]);
+      skeleton.setToSetupPose();
+    }
+
+    // 统计 clipping 附件（spine-canvas 不支持它，这是走 WebGL 的理由）
+    var clipping = 0, mesh = 0;
+    (data.skins || []).forEach(function (sk) {
+      var list = [];
+      try { list = sk.getAttachments() || []; } catch (e) { list = []; }
+      list.forEach(function (e) {
+        var a = e && e.attachment;
+        if (!a) return;
+        var cn = (a.constructor && a.constructor.name) || '';
+        if (cn === 'ClippingAttachment') clipping++;
+        else if (cn === 'MeshAttachment') mesh++;
+      });
+    });
+    log('附件统计 mesh=' + mesh + ' clipping=' + clipping);
+
+    var sd = new spine.AnimationStateData(data);
+    sd.defaultMix = 0;
+    var state = new spine.AnimationState(sd);
+    state.setAnimation(0, job.name, true);
+
+    var glc = context.gl;
+    var frames = [];
+    var dt = 1 / job.fps;
+    for (var i = 0; i < job.total; i++) {
+      skeleton.setToSetupPose();
+      state.apply(skeleton);
+      // 与 canvas 路径同一套变换：缩放 + 按包围盒平移。
+      // Y 轴取负 —— Spine 的 Y 向上、PNG 的 Y 向下。
+      skeleton.x = -job.bounds.minX * job.scale;
+      skeleton.y = job.bounds.maxY * job.scale;
+      skeleton.scaleX = job.scale;
+      skeleton.scaleY = -job.scale;
+      skeleton.updateWorldTransform();
+
+      renderer.camera.position.x = job.canvasW / 2;
+      renderer.camera.position.y = job.canvasH / 2;
+      renderer.camera.viewportWidth = job.canvasW;
+      renderer.camera.viewportHeight = job.canvasH;
+      renderer.camera.zoom = 1;
+      // Spine 的 ortho 相机 Y 向上：把画布中心作为原点，所以骨架要平移 -H/2
+      renderer.camera.update();
+
+      glc.viewport(0, 0, job.canvasW, job.canvasH);
+      glc.clearColor(0, 0, 0, 0);
+      glc.clear(glc.COLOR_BUFFER_BIT | glc.STENCIL_BUFFER_BIT);
+      renderer.begin();
+      renderer.drawSkeleton(skeleton, true);
+      renderer.end();
+
+      var px = new Uint8Array(job.canvasW * job.canvasH * 4);
+      glc.readPixels(0, 0, job.canvasW, job.canvasH, glc.RGBA, glc.UNSIGNED_BYTE, px);
+      frames.push(px);
+
+      state.update(dt);
+    }
+    return { frames: frames, width: job.canvasW, height: job.canvasH, clipping: clipping, mesh: mesh };
+  };
+
+  function readData(spine, skelB64, atlasText) {
+    var loader = new spine.AtlasAttachmentLoader(new spine.TextureAtlas(atlasText, function () { return null; }));
+    var bin = Uint8Array.from(atob(skelB64), function (c) { return c.charCodeAt(0); });
+    return new spine.SkeletonBinary(loader).readSkeletonData(bin);
   }
 
-  const atlas = new spine.TextureAtlas(job.atlasText, (path) => textures[path] || textures[path.split('/').pop()]);
-  const factory = new spine.AtlasAttachmentLoader(atlas);
-  const reader = new spine.SkeletonBinary(factory);
-  const bin = Uint8Array.from(atob(job.skelB64), (c) => c.charCodeAt(0));
-  const data = reader.readSkeletonData(bin);
-  log('skeleton version=' + data.version + ' anims=' + data.animations.length);
+  window.__probe = function (skelB64, atlasText) {
+    var data = readData(window.__SPINE__, skelB64, atlasText);
+    return {
+      version: data.version,
+      anims: data.animations.map(function (a) { return a.name; }),
+    };
+  };
 
-  const skeleton = new spine.Skeleton(data);
-  if (data.skins && data.skins.length) {
-    skeleton.setSkin(data.skins.find((s) => s.name === 'default') || data.skins[0]);
-    skeleton.setToSetupPose();
-  }
-  skeleton.scaleY = -1;
+  // 取某段动画的时长与「整段动画的包围盒」——包围盒必须逐帧扫，
+  // 不能只看 setup pose（角色抬手/跳跃时 bbox 会超出 setup pose 很多，
+  // 只看 setup pose 会把动作裁掉）。与 canvas 路径的 scanBounds 同口径。
+  window.__animInfo = function (skelB64, atlasText, animName) {
+    var spine = window.__SPINE__;
+    var data = readData(spine, skelB64, atlasText);
+    var anim = data.animations.find(function (a) { return a.name === animName; }) || data.animations[0];
+    var duration = anim.duration;
+    var fps = 8;
+    var total = Math.max(1, Math.round(duration * fps));
+    var skeleton = new spine.Skeleton(data);
+    if (data.skins && data.skins.length) {
+      skeleton.setSkin(data.skins.find(function (s) { return s.name === 'default'; }) || data.skins[0]);
+      skeleton.setToSetupPose();
+    }
+    var sd = new spine.AnimationStateData(data);
+    sd.defaultMix = 0;
+    var st = new spine.AnimationState(sd);
+    st.setAnimation(0, animName, true);
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    function consider(x, y) {
+      if (!isFinite(x) || !isFinite(y)) return;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    for (var f = 0; f < total; f++) {
+      skeleton.setToSetupPose();
+      st.apply(skeleton);
+      skeleton.updateWorldTransform();
+      for (var si = 0; si < skeleton.slots.length; si++) {
+        var slot = skeleton.slots[si];
+        var att = slot.getAttachment();
+        if (!att) continue;
+        var cn = (att.constructor && att.constructor.name) || '';
+        if (cn === 'ClippingAttachment' || cn === 'BoundingBoxAttachment' || cn === 'PathAttachment' || cn === 'PointAttachment') continue;
+        if (typeof att.computeWorldVertices === 'function') {
+          var n = att.worldVerticesLength || (att.vertices ? att.vertices.length : 0);
+          if (n > 0) {
+            var tmp = new Float32Array(n);
+            try {
+              att.computeWorldVertices(slot, 0, n, tmp, 0, 2);
+              for (var q = 0; q + 1 < n; q += 2) consider(tmp[q], tmp[q + 1]);
+            } catch (e) { /* 某些附件形态不兼容，跳过 */ }
+          }
+        }
+      }
+      st.update(1 / fps);
+    }
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 100; maxY = 100; }
+    return { duration: duration, total: total,
+      bounds: { minX: minX, minY: minY, maxX: maxX, maxY: maxY } };
+  };
 
-  const renderer = new spine.SkeletonRenderer(gl);
-  // spine-webgl 的渲染器需要显式给投影，画布坐标 = 像素坐标，Y 向下
-  renderer.camera = new spine.OrthoCamera(job.canvasW, job.canvasH);
-  renderer.camera.position.set(job.canvasW / 2, job.canvasH / 2);
-  renderer.camera.viewportWidth = job.canvasW;
-  renderer.camera.viewportHeight = job.canvasH;
-  renderer.camera.update();
-
-  const sd = new spine.AnimationStateData(data);
-  sd.defaultMix = 0;
-  const state = new spine.AnimationState(sd);
-  state.setAnimation(0, job.name, true);
-
-  const frames = [];
-  const dt = 1 / job.fps;
-  for (let i = 0; i < job.total; i++) {
-    skeleton.setToSetupPose();
-    state.update(0);
-    state.apply(skeleton);
-    skeleton.updateWorldTransform();
-    // 缩放 + 平移（与 canvas 路径同一套包围盒，保证两条路径产物可对齐）
-    skeleton.x = -job.bounds.minX * job.scale;
-    skeleton.y = -job.bounds.minY * job.scale;
-    skeleton.scaleX = job.scale;
-    skeleton.scaleY = -job.scale;
-    skeleton.updateWorldTransform();
-
-    gl.viewport(0, 0, job.canvasW, job.canvasH);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    gl.enable(gl.BLEND);
-    renderer.begin();
-    renderer.draw(skeleton);
-    renderer.end();
-
-    const px = new Uint8Array(job.canvasW * job.canvasH * 4);
-    gl.readPixels(0, 0, job.canvasW, job.canvasH, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    frames.push(px);
-
-    state.update(dt);
-  }
-  return { frames, width: job.canvasW, height: job.canvasH };
-};
-window.__ready = true;
-log('ready');
+  window.__ready = true;
+})();
 </script>
 </body></html>

@@ -118,15 +118,22 @@ jobs:
           xvfb-run -a --server-args='-screen 0 1280x1024x24' \
             npx electron --no-sandbox \
               --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader \
-              tools/spine_webgl_export.mjs --model models/002_amiya --out _gl 2>&1 | tee gl.log
+              tools/spine_webgl_export.mjs --model models/002_amiya --out _gl \
+              --anim Relax --fps 8 --scale 0.5 --id webgl-test-amiya 2>&1 | tee gl.log
           echo '--- 校验 ---'
-          grep -q '版本' gl.log || { echo '::error::没有打印 skeleton 版本，可能注入失败'; exit 1; }
-          grep -q '动画:' gl.log || { echo '::error::没有读到动画列表'; exit 1; }
-          echo '✅ WebGL 路径可用'
+          grep -q '版本' gl.log || { echo '::error::没有打印 skeleton 版本，注入可能失败'; exit 1; }
+          grep -q '帧 @' gl.log || { echo '::error::没有烘焙出帧'; exit 1; }
+          test -f _gl/pack.json || { echo '::error::没有生成 pack.json'; exit 1; }
+          # 关键：产物必须能被独立反解，且不是全透明
+          node tools/verify_png.mjs _gl/frames
+          echo '✅ WebGL 路径可用（产物已反解验证）'
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: spine-webgl-log
-          path: gl.log
+          path: |
+            gl.log
+            _gl/pack.json
+            _gl/frames/*.png
           if-no-files-found: warn

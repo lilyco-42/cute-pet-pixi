@@ -132,18 +132,76 @@ async function main() {
   const outDir = path.resolve(a.out || path.join(modelDir, 'pack-webgl'));
   fs.mkdirSync(path.join(outDir, 'frames'), { recursive: true });
 
-  // 先问模型有哪些动画与包围盒（用页内的 spine 直接读）
-  const probe = await win.webContents.executeJavaScript(`(async function(){
-    var spine = window.__SPINE__;
-    var bin = Uint8Array.from(atob(${JSON.stringify(skelB64)}), function(c){return c.charCodeAt(0);});
-    var loader = new spine.AtlasAttachmentLoader(new spine.TextureAtlas(${JSON.stringify(atlasText)}, function(){ return null; }));
-    var data = new spine.SkeletonBinary(loader).readSkeletonData(bin);
-    return { anims: data.animations.map(function(x){return x.name;}), version: data.version };
-  })()`);
+  const probe = await win.webContents.executeJavaScript(
+    'window.__probe(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ')');
   console.log('  版本 ' + probe.version + ' | 动画: ' + probe.anims.join(', '));
 
-  console.log('  注意：完整烘焙请用 --anim 指定单段动画（每次一个 GL 建立周期）');
-  console.log('  可用动画: ' + probe.anims.join(','));
+  const animNames = a.anim ? String(a.anim).split(',') : probe.anims.slice();
+  // 单段动画时长 -> 帧数（ticks 单位 1/60 秒，与 canvas 路径一致）
+  const ticks = Math.round(60 / fps);
+  const animations = {};
+
+  for (const name of animNames) {
+    const info = await win.webContents.executeJavaScript(
+      'window.__animInfo(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ',' + JSON.stringify(name) + ')');
+    let total = Math.max(1, Math.round(info.duration * fps));
+    if (a['max-frames'] && Number(a['max-frames']) > 0) total = Math.min(total, Number(a['max-frames']));
+
+    // 包围盒：用页内的 spine 扫一遍，保证与 canvas 路径同口径（PAD=2 也一致）
+    const PAD = 2;
+    const bounds = {
+      minX: info.bounds.minX - PAD, minY: info.bounds.minY - PAD,
+      maxX: info.bounds.maxX + PAD, maxY: info.bounds.maxY + PAD,
+    };
+    const canvasW = Math.max(1, Math.ceil((bounds.maxX - bounds.minX) * scale));
+    const canvasH = Math.max(1, Math.ceil((bounds.maxY - bounds.minY) * scale));
+
+    const res = await win.webContents.executeJavaScript(
+      'window.__bake(' + JSON.stringify({
+        base, atlasText, pngByPage, skelB64, bounds, scale, fps,
+        total, name, canvasW, canvasH,
+      }) + ')');
+
+    const files = [];
+    for (let i = 0; i < res.frames.length; i++) {
+      const raw = res.frames[i];
+      // executeJavaScript 会把 TypedArray 序列化成 {0:..,1:..} 之类的对象，
+      // 所以这里转回 Uint8Array —— 直接当数组用会得到一个空 PNG。
+      const arr = raw instanceof Uint8Array ? raw : Uint8Array.from(Object.values(raw));
+      const png = encodePng(canvasW, canvasH, arr);
+      const file = name + '_' + String(i).padStart(3, '0') + '.png';
+      fs.writeFileSync(path.join(outDir, 'frames', file), png);
+      files.push(file);
+    }
+    animations[name] = {
+      loop: true,
+      directions: { '0': { frames: files.map((f) => ({ ticks, layers: [{ src: 'frames/' + f, x: 0, y: 0 }] })) } },
+    };
+    console.log('  ' + name + ': ' + files.length + ' 帧 @ ' + canvasW + 'x' + canvasH +
+      '  mesh=' + res.mesh + ' clipping=' + res.clipping);
+  }
+
+  const pack = {
+    schema: 1,
+    id: a.id || ('spine-webgl.' + base),
+    format: 'frames',
+    canvas: { width: 0, height: 0 },
+    scale: 1,
+    anchor: { x: 0.5, y: 1.0 },
+    hitThreshold: 90,
+    source: { kind: 'spine', tool: 'spine_webgl_export.mjs', renderer: 'spine-webgl 3.8.95', model: base },
+    animations,
+  };
+  // 画布尺寸取第一段动画的（同一模型的包围盒是共享的，所以各段一致）
+  const first = Object.values(animations)[0];
+  const firstFrameFile = first.directions['0'].frames[0].layers[0].src;
+  const sample = fs.readFileSync(path.join(outDir, firstFrameFile));
+  pack.canvas.width = sample.readUInt32BE(16);
+  pack.canvas.height = sample.readUInt32BE(20);
+
+  fs.writeFileSync(path.join(outDir, 'pack.json'), JSON.stringify(pack, null, 2));
+  console.log('pack.json -> ' + path.join(outDir, 'pack.json') +
+    '  画布 ' + pack.canvas.width + 'x' + pack.canvas.height + ' / ticks=' + ticks);
   app.exit(0);
 }
 
