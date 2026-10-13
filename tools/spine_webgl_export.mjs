@@ -102,7 +102,23 @@ async function main() {
   }
 
   await app.whenReady();
-  const win = new BrowserWindow({ show: false, width: 64, height: 64, webPreferences: { offscreen: false } });
+  const win = new BrowserWindow({
+    show: false,
+    width: 64,
+    height: 64,
+    webPreferences: { offscreen: false, contextIsolation: false, nodeIntegration: false },
+  });
+
+  // 把渲染进程的 console 与异常转发到宿主 stdout。
+  // 不做这一步，页面里抛的错只会得到一句 
+  // 'Script failed to execute ... Check the renderer console'，排查全靠猜 ——
+  // 实际浪费过两轮 CI。
+  win.webContents.on('console-message', (e, level, message, line, sourceId) => {
+    console.error('[page] ' + message + (sourceId ? '  (' + sourceId + ':' + line + ')' : ''));
+  });
+  win.webContents.on('render-process-gone', (e, d) => {
+    console.error('[page] 渲染进程退出: ' + JSON.stringify(d));
+  });
   await win.loadFile(path.join(HERE, 'spine_webgl_bake.html'));
 
   // 注入 spine-webgl 运行时（与 canvas 路径同一个 3.8.95 tag，保证版本一致）
@@ -132,8 +148,14 @@ async function main() {
   const outDir = path.resolve(a.out || path.join(modelDir, 'pack-webgl'));
   fs.mkdirSync(path.join(outDir, 'frames'), { recursive: true });
 
-  const probe = await win.webContents.executeJavaScript(
-    'window.__probe(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ')');
+  let probe;
+  try {
+    probe = await win.webContents.executeJavaScript(
+      'window.__probe(' + JSON.stringify(skelB64) + ',' + JSON.stringify(atlasText) + ')');
+  } catch (e) {
+    // 页面里抛的错被 Electron 包成一句无信息的话，真正的错误在转发出来的 [page] 行里
+    throw new Error('__probe 失败（看上面的 [page] 行）: ' + e.message);
+  }
   console.log('  版本 ' + probe.version + ' | 动画: ' + probe.anims.join(', '));
 
   const animNames = a.anim ? String(a.anim).split(',') : probe.anims.slice();
